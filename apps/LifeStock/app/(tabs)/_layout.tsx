@@ -1,33 +1,45 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { createNativeBottomTabNavigator } from "@react-navigation/bottom-tabs/unstable";
+import { withLayoutContext } from "expo-router";
+import React from "react";
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+const { Navigator } = createNativeBottomTabNavigator();
+
+const Tabs = withLayoutContext(Navigator);
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
+    <Tabs>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: "首页",
+          tabBarSystemItem: "favorites",
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="contacts"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: "联系人",
+          tabBarSystemItem: "contacts",
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "设置",
+          tabBarSystemItem: "more",
+        }}
+      />
+      <Tabs.Screen
+        name="search"
+        options={{
+          tabBarSystemItem: "search",
+          headerShown: true,
+          headerTransparent: true,
+          headerTitle: "",
+          headerSearchBarOptions: {
+            placeholder: "搜索...",
+          },
         }}
       />
     </Tabs>

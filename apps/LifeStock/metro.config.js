@@ -5,6 +5,13 @@ const { withUniwindConfig } = require('uniwind/metro');
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
+// Drizzle ORM 需要 .sql 文件支持
+config.resolver.sourceExts.push('sql');
+
+// 启用 Package Exports 支持，解决 drizzle-orm 导入问题
+config.resolver.unstable_enablePackageExports = true;
+
+
 module.exports = withUniwindConfig(config, {
     // relative path to your global.css file (from previous step)
     cssEntryFile: './global.css',
