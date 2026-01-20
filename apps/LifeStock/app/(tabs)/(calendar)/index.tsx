@@ -17,21 +17,31 @@ import {
 
 
 // ============= 日期工具函数 =============
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function formatTime(date: Date): string {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
 function formatDate(timestamp: number): string {
   const date = new Date(timestamp);
-  return `${date.getMonth() + 1}月${date.getDate()}日`;
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${formatTime(date)}`;
 }
 
-function getDaysRemaining(expiryTimestamp: number): number {
-  const now = Date.now();
-  const diff = expiryTimestamp - now;
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+function getDayDiff(expiryTimestamp: number): number {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const targetDate = new Date(expiryTimestamp);
+  targetDate.setHours(0, 0, 0, 0);
+  return Math.round((targetDate.getTime() - startOfToday.getTime()) / MS_PER_DAY);
 }
 
-function getStatusColor(daysRemaining: number): { bg: string; text: string } {
-  if (daysRemaining < 0) {
+function getStatusColor(expiryTimestamp: number): { bg: string; text: string } {
+  if (expiryTimestamp < Date.now()) {
     return { bg: "#FFEBEE", text: "#D32F2F" }; // 已过期 - 红色
-  } else if (daysRemaining <= 7) {
+  }
+  const daysRemaining = getDayDiff(expiryTimestamp);
+  if (daysRemaining <= 7) {
     return { bg: "#FFF3E0", text: "#F57C00" }; // 7天内 - 橙色
   } else if (daysRemaining <= 30) {
     return { bg: "#FFF8E1", text: "#FFA000" }; // 30天内 - 黄色
@@ -40,17 +50,16 @@ function getStatusColor(daysRemaining: number): { bg: string; text: string } {
   }
 }
 
-function getStatusText(daysRemaining: number, type: string): string {
+function getStatusText(expiryTimestamp: number, type: string): string {
+  const daysRemaining = getDayDiff(expiryTimestamp);
   const action = type === "recurring" ? "操作" : "到期";
-  if (daysRemaining < 0) {
+  if (expiryTimestamp < Date.now()) {
+    if (daysRemaining === 0) return "已逾期";
     return `已逾期 ${Math.abs(daysRemaining)} 天`;
-  } else if (daysRemaining === 0) {
-    return `今天${action}`;
-  } else if (daysRemaining === 1) {
-    return `明天${action}`;
-  } else {
-    return `${daysRemaining} 天后${action}`;
   }
+  if (daysRemaining === 0) return `今天${action}`;
+  if (daysRemaining === 1) return `明天${action}`;
+  return `${daysRemaining} 天后${action}`;
 }
 
 
@@ -467,9 +476,8 @@ export default function CalendarScreen() {
                 reminder.reminderType === "one_time"
                   ? reminder.dueDate!
                   : reminder.nextDueDate!;
-              const daysRemaining = getDaysRemaining(targetDate);
-              const statusColor = getStatusColor(daysRemaining);
-              const statusText = getStatusText(daysRemaining, reminder.reminderType);
+              const statusColor = getStatusColor(targetDate);
+              const statusText = getStatusText(targetDate, reminder.reminderType);
 
               return (
                 <View key={reminder.id} style={styles.itemCard}>

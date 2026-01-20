@@ -22,15 +22,15 @@ const DEFAULT_ICONS: Record<ItemType, string> = {
 };
 
 const COMMON_UNITS = ["个", "件", "包", "盒", "瓶", "袋", "支", "片"];
-const CARRIERS = [
-  "中国移动",
-  "中国联通",
-  "中国电信",
-  "中国广电",
-  "Ultra Mobile",
-  "giffgaff",
-  "RedteaGO",
-];
+// const CARRIERS = [
+//   "中国移动",
+//   "中国联通",
+//   "中国电信",
+//   "中国广电",
+//   "Ultra Mobile",
+//   "giffgaff",
+//   "RedteaGO",
+// ];
 
 type AccountType = "balance" | "times" | "none";
 
@@ -189,8 +189,8 @@ export default function EditItemScreen() {
         typeof metaPhoneNumber === "string"
           ? metaPhoneNumber
           : metaPhoneNumber !== undefined && metaPhoneNumber !== null
-          ? String(metaPhoneNumber)
-          : ""
+            ? String(metaPhoneNumber)
+            : ""
       );
       const metaCarrier = parsedMetadata.carrier;
       setCarrier(typeof metaCarrier === "string" ? metaCarrier : "");
@@ -406,20 +406,14 @@ export default function EditItemScreen() {
                     keyboardType="phone-pad"
                   />
                 </FormRow>
-                <Text className="text-[13px] font-bold text-gray-400 mb-3 px-2">运营商</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-                  <View className="flex-row gap-2.5 px-1">
-                    {CARRIERS.map((c) => (
-                      <Pressable
-                        key={c}
-                        onPress={() => setCarrier(c)}
-                        className={`px-5 py-2.5 rounded-2xl border ${carrier === c ? "bg-green-500 border-green-400 shadow-md" : "bg-white border-gray-100"}`}
-                      >
-                        <Text className={`text-[13px] font-bold ${carrier === c ? "text-white" : "text-gray-600"}`}>{c}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </ScrollView>
+                <FormRow label="运营商">
+                  <TextInput
+                    className="text-[16px] font-bold text-black text-right flex-1 ml-4"
+                    placeholder="输入运营商"
+                    value={carrier}
+                    onChangeText={setCarrier}
+                  />
+                </FormRow>
               </View>
             </View>
           )}

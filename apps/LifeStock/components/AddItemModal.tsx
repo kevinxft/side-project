@@ -2,14 +2,17 @@ import type { ItemType, RecurrenceUnit, ReminderType } from "@/db/schema";
 import { itemService, reminderService } from "@/db/services";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetBackdrop, BottomSheetBackdropProps, BottomSheetModal, BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import { Picker } from "@react-native-picker/picker";
 import React, { forwardRef, useCallback, useMemo, useState } from "react";
 import {
+    Modal,
     Pressable,
     ScrollView,
     Text,
     TextInput,
     View,
 } from "react-native";
+import { ReminderSection } from "./ReminderSection";
 
 const TYPE_CONFIG: Record<ItemType, { label: string; icon: string; color: string }> = {
     product: { label: "产品", icon: "cube-outline", color: "#3B82F6" },
@@ -20,7 +23,7 @@ const TYPE_CONFIG: Record<ItemType, { label: string; icon: string; color: string
 };
 
 const COMMON_UNITS = ["个", "件", "包", "盒", "瓶", "袋", "支", "片"];
-const CARRIERS = ["中国移动", "中国联通", "中国电信", "中国广电", "Ultra Mobile", "giffgaff", "RedteaGO"];
+// const CARRIERS = ["中国移动", "中国联通", "中国电信", "中国广电", "Ultra Mobile", "giffgaff", "RedteaGO"];
 const RECURRENCE_UNITS: { label: string; value: RecurrenceUnit }[] = [
     { label: "天", value: "day" },
     { label: "周", value: "week" },
@@ -29,15 +32,23 @@ const RECURRENCE_UNITS: { label: string; value: RecurrenceUnit }[] = [
 ];
 
 interface AddItemSheetProps {
+    initialType: ItemType | null;
     onClose: () => void;
 }
 
 export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
-    ({ onClose }, ref) => {
+    ({ initialType, onClose }, ref) => {
         const [type, setType] = useState<ItemType>("product");
         const [name, setName] = useState("");
         const [icon, setIcon] = useState("📦");
         const [notes, setNotes] = useState("");
+
+        // Reset state when type changes via initialType
+        React.useEffect(() => {
+            if (initialType) {
+                handleTypeChange(initialType);
+            }
+        }, [initialType]);
 
         // Product/Supply fields
         const [quantity, setQuantity] = useState("");
@@ -63,6 +74,15 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
         const [recUnit, setRecUnit] = useState<RecurrenceUnit>("month");
         const [remindDays, setRemindDays] = useState("0");
         const [dueDate, setDueDate] = useState<number | null>(null);
+        const [reminderHour, setReminderHour] = useState(9);
+        const [reminderMinute, setReminderMinute] = useState(0);
+        const [showDatePicker, setShowDatePicker] = useState(false);
+        const [showTimePicker, setShowTimePicker] = useState(false);
+        const [tempYear, setTempYear] = useState(new Date().getFullYear());
+        const [tempMonth, setTempMonth] = useState(new Date().getMonth());
+        const [tempDay, setTempDay] = useState(new Date().getDate());
+        const [tempHour, setTempHour] = useState(9);
+        const [tempMinute, setTempMinute] = useState(0);
 
         const snapPoints = useMemo(() => ["90%"], []);
 
@@ -91,11 +111,90 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
             setPhoneNumber("");
             setCarrier("");
             setHasReminder(false);
+            setDueDate(null);
+            setReminderHour(9);
+            setReminderMinute(0);
+            setShowDatePicker(false);
+            setShowTimePicker(false);
             onClose();
         }, [onClose]);
 
+        const formatTime = (hour: number, minute: number) =>
+            `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+
+        const updateDueDateWithTime = (hour: number, minute: number) => {
+            const base = dueDate ? new Date(dueDate) : new Date();
+            base.setHours(hour, minute, 0, 0);
+            setDueDate(base.getTime());
+        };
+
+        const updateDueDateWithDate = (year: number, month: number, day: number) => {
+            const base = new Date();
+            base.setFullYear(year, month, day);
+            base.setHours(reminderHour, reminderMinute, 0, 0);
+            setDueDate(base.getTime());
+        };
+
+        const openDatePicker = () => {
+            const base = dueDate ? new Date(dueDate) : new Date();
+            setTempYear(base.getFullYear());
+            setTempMonth(base.getMonth());
+            setTempDay(base.getDate());
+            setShowDatePicker(true);
+        };
+
+        const openTimePicker = () => {
+            const base = dueDate ? new Date(dueDate) : null;
+            setTempHour(base ? base.getHours() : reminderHour);
+            setTempMinute(base ? base.getMinutes() : reminderMinute);
+            setShowTimePicker(true);
+        };
+
+        const confirmDateSelection = () => {
+            updateDueDateWithDate(tempYear, tempMonth, tempDay);
+            setShowDatePicker(false);
+        };
+
+        const confirmTimeSelection = () => {
+            setReminderHour(tempHour);
+            setReminderMinute(tempMinute);
+            updateDueDateWithTime(tempHour, tempMinute);
+            setShowTimePicker(false);
+        };
+
+        const cancelDateSelection = () => {
+            setShowDatePicker(false);
+        };
+
+        const cancelTimeSelection = () => {
+            setShowTimePicker(false);
+        };
+
+        const resolveOneTimeDueDate = () => {
+            if (dueDate) return dueDate;
+            const base = new Date();
+            base.setHours(reminderHour, reminderMinute, 0, 0);
+            return base.getTime();
+        };
+
+        const resolveRecurringStartDate = () => {
+            if (dueDate) return dueDate;
+            const base = new Date();
+            base.setHours(reminderHour, reminderMinute, 0, 0);
+            return base.getTime();
+        };
+
         const handleAddItem = async () => {
-            if (!name.trim()) return;
+            let finalName = name.trim();
+
+            // 自动推导名称
+            if (type === "phone") {
+                finalName = phoneNumber.trim() || "新号码";
+            } else if (type === "account") {
+                finalName = merchantName.trim() || "新账户";
+            }
+
+            if (!finalName) return;
 
             try {
                 const metadata: any = {};
@@ -118,7 +217,7 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
 
                 const newItem = await itemService.create({
                     type,
-                    name: name.trim(),
+                    name: finalName,
                     icon,
                     notes: notes.trim() || null,
                     metadata: JSON.stringify(metadata),
@@ -126,15 +225,19 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
                 });
 
                 if (hasReminder) {
+                    const resolvedDueDate = reminderType === "one_time" ? resolveOneTimeDueDate() : null;
+                    const resolvedStartDate =
+                        reminderType === "recurring" ? resolveRecurringStartDate() : null;
                     await reminderService.create({
                         itemId: newItem.id,
                         reminderType,
                         title: reminderType === "one_time" ? "到期提醒" : "循环任务",
                         description: notes.trim() || null,
-                        dueDate: reminderType === "one_time" ? dueDate || Date.now() : null,
+                        dueDate: resolvedDueDate,
                         recurrenceInterval: reminderType === "recurring" ? parseInt(interval) : null,
                         recurrenceUnit: reminderType === "recurring" ? recUnit : null,
-                        startDate: reminderType === "recurring" ? Date.now() : null,
+                        startDate: resolvedStartDate,
+                        nextDueDate: reminderType === "recurring" ? resolvedStartDate : null,
                         advanceDays: parseInt(remindDays) || 0,
                         isActive: 1,
                     });
@@ -156,7 +259,17 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
             else setIcon("📁");
         };
 
-        const canSubmit = name.trim().length > 0;
+        const canSubmit = type === "phone" ? phoneNumber.trim().length > 0 :
+            type === "account" ? merchantName.trim().length > 0 :
+                name.trim().length > 0;
+        const currentYear = new Date().getFullYear();
+        const yearOptions = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i);
+        const monthOptions = Array.from({ length: 12 }, (_, i) => i);
+        const daysInTempMonth = new Date(tempYear, tempMonth + 1, 0).getDate();
+        const dayOptions = Array.from({ length: daysInTempMonth }, (_, i) => i + 1);
+        const hourOptions = Array.from({ length: 24 }, (_, i) => i);
+        const minuteOptions = Array.from({ length: 60 }, (_, i) => i);
+        const timeLabel = formatTime(reminderHour, reminderMinute);
 
         const FormRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
             <View className="flex-row items-center justify-between px-4 py-3 h-12">
@@ -220,21 +333,55 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
                     contentContainerStyle={{ paddingTop: 20, paddingBottom: 80 }}
                     keyboardShouldPersistTaps="handled"
                 >
-                    {/* 名称卡片 */}
+                    {/* 名称/核心信息卡片 */}
                     <View className="mx-4 mb-6 bg-white rounded-2xl overflow-hidden">
-                        <View className="flex-row items-center px-4 py-3 border-b border-gray-100">
-                            <View className="w-10 h-10 rounded-full bg-gray-50 items-center justify-center mr-3 border border-gray-100">
-                                <Text className="text-[22px]">{icon}</Text>
+                        {(type === "product" || type === "supply" || type === "other") && (
+                            <View className="flex-row items-center px-4 py-3 border-b border-gray-100">
+                                <View className="w-10 h-10 rounded-full bg-gray-50 items-center justify-center mr-3 border border-gray-100">
+                                    <Text className="text-[22px]">{icon}</Text>
+                                </View>
+                                <TextInput
+                                    className="flex-1 text-[17px] font-medium text-black h-10"
+                                    placeholder={type === "other" ? "名称" : (type === "product" ? "产品名称" : "耗材名称")}
+                                    placeholderTextColor="#C7C7CC"
+                                    value={name}
+                                    onChangeText={setName}
+                                    clearButtonMode="while-editing"
+                                />
                             </View>
-                            <TextInput
-                                className="flex-1 text-[17px] font-medium text-black h-10"
-                                placeholder="物品名称"
-                                placeholderTextColor="#C7C7CC"
-                                value={name}
-                                onChangeText={setName}
-                                clearButtonMode="while-editing"
-                            />
-                        </View>
+                        )}
+
+                        {type === "phone" && (
+                            <View className="flex-row items-center px-4 py-3 border-b border-gray-100">
+                                <View className="w-10 h-10 rounded-full bg-green-50 items-center justify-center mr-3 border border-green-100">
+                                    <Text className="text-[22px]">📱</Text>
+                                </View>
+                                <TextInput
+                                    className="flex-1 text-[22px] font-bold text-black h-12"
+                                    placeholder="输入手机号"
+                                    placeholderTextColor="#C7C7CC"
+                                    value={phoneNumber}
+                                    onChangeText={setPhoneNumber}
+                                    keyboardType="phone-pad"
+                                />
+                            </View>
+                        )}
+
+                        {type === "account" && (
+                            <View className="flex-row items-center px-4 py-3 border-b border-gray-100">
+                                <View className="w-10 h-10 rounded-full bg-purple-50 items-center justify-center mr-3 border border-purple-100">
+                                    <Text className="text-[22px]">💳</Text>
+                                </View>
+                                <TextInput
+                                    className="flex-1 text-[18px] font-bold text-black h-12"
+                                    placeholder="商家或服务名称"
+                                    placeholderTextColor="#C7C7CC"
+                                    value={merchantName}
+                                    onChangeText={setMerchantName}
+                                />
+                            </View>
+                        )}
+
                         <View className="flex-row items-start px-4 py-3 h-24">
                             <Ionicons name="documents-outline" size={20} color="#C7C7CC" style={{ marginTop: 2, marginRight: 10 }} />
                             <TextInput
@@ -249,39 +396,24 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
                         </View>
                     </View>
 
-                    {/* 类型选择 */}
-                    <View className="mb-6">
-                        <Text className="px-5 text-[13px] font-medium text-gray-500 mb-2 uppercase tracking-wide">类型</Text>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
-                        >
-                            {(Object.keys(TYPE_CONFIG) as ItemType[]).map((t) => {
-                                const config = TYPE_CONFIG[t];
-                                const isActive = type === t;
-                                return (
+                    {/* 类型选择 - 仅在 Product/Supply 下显示切换 */}
+                    {(type === "product" || type === "supply") && (
+                        <View className="mb-6">
+                            <View className="flex-row bg-gray-200/50 p-1 mx-4 rounded-xl">
+                                {(['product', 'supply'] as const).map(m => (
                                     <Pressable
-                                        key={t}
-                                        onPress={() => handleTypeChange(t)}
-                                        className={`flex-row items-center px-4 py-2.5 rounded-full border ${isActive ? "bg-black border-black" : "bg-white border-white"}`}
-                                        style={!isActive ? { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 } : {}}
+                                        key={m}
+                                        onPress={() => handleTypeChange(m)}
+                                        className={`flex-1 py-1.5 rounded-[10px] items-center justify-center ${type === m ? "bg-white shadow-sm" : ""}`}
                                     >
-                                        <Ionicons
-                                            name={config.icon as any}
-                                            size={16}
-                                            color={isActive ? "#FFF" : "#636366"}
-                                        />
-                                        <Text
-                                            className={`ml-1.5 font-medium text-[14px] ${isActive ? "text-white" : "text-[#1C1C1E]"}`}
-                                        >
-                                            {config.label}
+                                        <Text className={`text-[13px] font-semibold ${type === m ? "text-black" : "text-gray-500"}`}>
+                                            {m === "product" ? "产品" : "耗材"}
                                         </Text>
                                     </Pressable>
-                                );
-                            })}
-                        </ScrollView>
-                    </View>
+                                ))}
+                            </View>
+                        </View>
+                    )}
 
                     {/* Product/Supply Form */}
                     {(type === "product" || type === "supply") && (
@@ -321,39 +453,18 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
                         </View>
                     )}
 
-                    {/* Phone Form */}
+                    {/* Phone Form Fields */}
                     {type === "phone" && (
-                        <View className="mx-4 mb-6">
-                            <View className="bg-white rounded-2xl overflow-hidden mb-4">
-                                <FormRow label="手机号码">
-                                    <TextInput
-                                        className="text-[17px] text-black text-right flex-1 ml-4"
-                                        placeholder="输入号码"
-                                        placeholderTextColor="#C7C7CC"
-                                        value={phoneNumber}
-                                        onChangeText={setPhoneNumber}
-                                        keyboardType="phone-pad"
-                                    />
-                                </FormRow>
-                            </View>
-
-                            <Text className="px-5 text-[13px] font-medium text-gray-500 mb-2 uppercase tracking-wide">运营商</Text>
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
-                            >
-                                {CARRIERS.map((c) => (
-                                    <Pressable
-                                        key={c}
-                                        onPress={() => setCarrier(c)}
-                                        className={`px-4 py-2 rounded-xl border ${carrier === c ? "bg-white border-green-500 shadow-sm" : "bg-white border-transparent"}`}
-                                        style={carrier !== c ? { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 } : {}}
-                                    >
-                                        <Text className={`text-[14px] font-medium ${carrier === c ? "text-green-600" : "text-gray-800"}`}>{c}</Text>
-                                    </Pressable>
-                                ))}
-                            </ScrollView>
+                        <View className="mx-4 mb-6 bg-white rounded-2xl overflow-hidden">
+                            <FormRow label="运营商">
+                                <TextInput
+                                    className="text-[17px] text-black text-right flex-1 ml-4"
+                                    placeholder="输入运营商"
+                                    placeholderTextColor="#C7C7CC"
+                                    value={carrier}
+                                    onChangeText={setCarrier}
+                                />
+                            </FormRow>
                         </View>
                     )}
 
@@ -396,110 +507,152 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
                                         </View>
                                     </>
                                 )}
-                                <View>
-                                    <FormRow label="商家名称">
-                                        <TextInput
-                                            className="text-[17px] text-black text-right flex-1 ml-4"
-                                            placeholder="未设置"
-                                            placeholderTextColor="#C7C7CC"
-                                            value={merchantName}
-                                            onChangeText={setMerchantName}
-                                        />
-                                    </FormRow>
-                                </View>
                             </View>
                         </View>
                     )}
 
                     {/* Reminder Settings */}
-                    <View className="mx-4 mb-6">
+                    <ReminderSection
+                        hasReminder={hasReminder}
+                        setHasReminder={setHasReminder}
+                        reminderType={reminderType}
+                        setReminderType={setReminderType}
+                        interval={interval}
+                        setInterval={setInterval}
+                        recUnit={recUnit}
+                        setRecUnit={setRecUnit}
+                        remindDays={remindDays}
+                        setRemindDays={setRemindDays}
+                        dueDate={dueDate}
+                        timeLabel={timeLabel}
+                        onOpenDatePicker={openDatePicker}
+                        onOpenTimePicker={openTimePicker}
+                        FormRow={FormRow}
+                        NumberInput={NumberInput}
+                    />
+                </BottomSheetScrollView>
+
+                <Modal
+                    visible={showDatePicker}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={cancelDateSelection}
+                >
+                    <Pressable
+                        className="flex-1 items-center justify-center bg-black/40"
+                        onPress={cancelDateSelection}
+                    >
                         <Pressable
-                            onPress={() => setHasReminder(!hasReminder)}
-                            className="flex-row items-center justify-between px-4 py-3 bg-white rounded-2xl"
+                            className="bg-white rounded-2xl w-[85%] overflow-hidden"
+                            onPress={() => { }}
                         >
-                            <View className="flex-row items-center">
-                                <View className={`w-8 h-8 rounded-lg items-center justify-center mr-3 ${hasReminder ? "bg-blue-500" : "bg-gray-100"}`}>
-                                    <Ionicons name="notifications" size={18} color={hasReminder ? "white" : "#8E8E93"} />
-                                </View>
-                                <Text className="text-[17px] text-black">
-                                    提醒
-                                </Text>
+                            <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100">
+                                <Pressable onPress={cancelDateSelection}>
+                                    <Text className="text-[15px] text-gray-500">取消</Text>
+                                </Pressable>
+                                <Text className="text-[16px] font-semibold text-black">选择日期</Text>
+                                <Pressable onPress={confirmDateSelection}>
+                                    <Text className="text-[15px] font-semibold text-[#007AFF]">完成</Text>
+                                </Pressable>
                             </View>
-                            <View className={`w-[51px] h-[31px] rounded-full px-[2px] justify-center ${hasReminder ? "bg-[#34C759]" : "bg-[#E9E9EA]"}`}>
-                                <View className={`w-[27px] h-[27px] rounded-full bg-white shadow-sm transition-all duration-200 ${hasReminder ? "self-end" : "self-start"}`} />
+                            <View className="flex-row">
+                                <Picker
+                                    style={{ flex: 1, height: 200 }}
+                                    selectedValue={tempYear}
+                                    onValueChange={(value) => {
+                                        const nextYear = value as number;
+                                        const maxDay = new Date(nextYear, tempMonth + 1, 0).getDate();
+                                        setTempYear(nextYear);
+                                        if (tempDay > maxDay) setTempDay(maxDay);
+                                    }}
+                                >
+                                    {yearOptions.map((year) => (
+                                        <Picker.Item key={year} label={`${year}年`} value={year} />
+                                    ))}
+                                </Picker>
+                                <Picker
+                                    style={{ flex: 1, height: 200 }}
+                                    selectedValue={tempMonth}
+                                    onValueChange={(value) => {
+                                        const nextMonth = value as number;
+                                        const maxDay = new Date(tempYear, nextMonth + 1, 0).getDate();
+                                        setTempMonth(nextMonth);
+                                        if (tempDay > maxDay) setTempDay(maxDay);
+                                    }}
+                                >
+                                    {monthOptions.map((month) => (
+                                        <Picker.Item key={month} label={`${month + 1}月`} value={month} />
+                                    ))}
+                                </Picker>
+                                <Picker
+                                    style={{ flex: 1, height: 200 }}
+                                    selectedValue={tempDay}
+                                    onValueChange={(value) => setTempDay(value as number)}
+                                >
+                                    {dayOptions.map((day) => (
+                                        <Picker.Item key={day} label={`${day}日`} value={day} />
+                                    ))}
+                                </Picker>
                             </View>
                         </Pressable>
+                    </Pressable>
+                </Modal>
 
-                        {hasReminder && (
-                            <View className="mt-2 bg-white rounded-2xl overflow-hidden p-4">
-                                <View className="flex-row bg-gray-100 rounded-lg p-0.5 mb-4">
-                                    <Pressable
-                                        onPress={() => setReminderType("one_time")}
-                                        className={`flex-1 py-1.5 rounded-[7px] items-center justify-center ${reminderType === "one_time" ? "bg-white shadow-sm" : ""}`}
-                                    >
-                                        <Text className={`text-[13px] font-semibold ${reminderType === "one_time" ? "text-black" : "text-gray-500"}`}>
-                                            一次性
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        onPress={() => setReminderType("recurring")}
-                                        className={`flex-1 py-1.5 rounded-[7px] items-center justify-center ${reminderType === "recurring" ? "bg-white shadow-sm" : ""}`}
-                                    >
-                                        <Text className={`text-[13px] font-semibold ${reminderType === "recurring" ? "text-black" : "text-gray-500"}`}>
-                                            重复
-                                        </Text>
-                                    </Pressable>
-                                </View>
-
-                                {reminderType === "recurring" ? (
-                                    <View className="border-b border-gray-100 pb-3 mb-3">
-                                        <FormRow label="复发频率">
-                                            <View className="flex-row items-center">
-                                                <NumberInput value={interval} onChange={setInterval} placeholder="1" />
-                                                <Text className="mx-2 text-gray-400 font-medium text-[15px]">/</Text>
-                                                <View className="flex-row bg-gray-100 rounded-lg p-0.5">
-                                                    {RECURRENCE_UNITS.map(u => (
-                                                        <Pressable
-                                                            key={u.value}
-                                                            onPress={() => setRecUnit(u.value)}
-                                                            className={`px-3 py-1 rounded-md ${recUnit === u.value ? "bg-white shadow-sm" : ""}`}
-                                                        >
-                                                            <Text className={`text-[12px] font-medium ${recUnit === u.value ? "text-black" : "text-gray-500"}`}>
-                                                                {u.label}
-                                                            </Text>
-                                                        </Pressable>
-                                                    ))}
-                                                </View>
-                                            </View>
-                                        </FormRow>
-                                    </View>
-                                ) : (
-                                    <View className="border-b border-gray-100 pb-3 mb-3">
-                                        <FormRow label="到期日期">
-                                            <Pressable
-                                                onPress={() => {
-                                                    const d = new Date();
-                                                    d.setMonth(d.getMonth() + 1);
-                                                    setDueDate(d.getTime());
-                                                }}
-                                                className="bg-gray-100 px-3 py-1.5 rounded-lg"
-                                            >
-                                                <Text className={`text-[15px] ${dueDate ? "text-blue-600" : "text-gray-400"}`}>
-                                                    {dueDate ? new Date(dueDate).toLocaleDateString() : "选择日期"}
-                                                </Text>
-                                            </Pressable>
-                                        </FormRow>
-                                    </View>
-                                )}
-
-                                <FormRow label="提前提醒">
-                                    <NumberInput value={remindDays} onChange={setRemindDays} placeholder="0" suffix="天" />
-                                </FormRow>
+                <Modal
+                    visible={showTimePicker}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={cancelTimeSelection}
+                >
+                    <Pressable
+                        className="flex-1 items-center justify-center bg-black/40"
+                        onPress={cancelTimeSelection}
+                    >
+                        <Pressable
+                            className="bg-white rounded-2xl w-[80%] overflow-hidden"
+                            onPress={() => { }}
+                        >
+                            <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100">
+                                <Pressable onPress={cancelTimeSelection}>
+                                    <Text className="text-[15px] text-gray-500">取消</Text>
+                                </Pressable>
+                                <Text className="text-[16px] font-semibold text-black">选择时间</Text>
+                                <Pressable onPress={confirmTimeSelection}>
+                                    <Text className="text-[15px] font-semibold text-[#007AFF]">完成</Text>
+                                </Pressable>
                             </View>
-                        )}
-                    </View>
-                </BottomSheetScrollView>
-            </BottomSheetModal>
+                            <View className="flex-row">
+                                <Picker
+                                    style={{ flex: 1, height: 200 }}
+                                    selectedValue={tempHour}
+                                    onValueChange={(value) => setTempHour(value as number)}
+                                >
+                                    {hourOptions.map((hour) => (
+                                        <Picker.Item
+                                            key={hour}
+                                            label={String(hour).padStart(2, "0")}
+                                            value={hour}
+                                        />
+                                    ))}
+                                </Picker>
+                                <Picker
+                                    style={{ flex: 1, height: 200 }}
+                                    selectedValue={tempMinute}
+                                    onValueChange={(value) => setTempMinute(value as number)}
+                                >
+                                    {minuteOptions.map((minute) => (
+                                        <Picker.Item
+                                            key={minute}
+                                            label={String(minute).padStart(2, "0")}
+                                            value={minute}
+                                        />
+                                    ))}
+                                </Picker>
+                            </View>
+                        </Pressable>
+                    </Pressable>
+                </Modal>
+            </BottomSheetModal >
         );
     }
 );

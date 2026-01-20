@@ -15,6 +15,15 @@ const TYPE_LABELS: Record<string, string> = {
   other: "其他",
 };
 
+const formatTime = (date: Date) =>
+  `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+
+const formatReminderDateTime = (timestamp: number | null) => {
+  if (!timestamp) return "-";
+  const date = new Date(timestamp);
+  return `${date.toLocaleDateString("zh-CN")} ${formatTime(date)}`;
+};
+
 type ReminderLogWithReminder = ReminderLog & { reminder: Reminder };
 
 export default function ItemDetailScreen() {
@@ -184,9 +193,7 @@ export default function ItemDetailScreen() {
                   reminder.reminderType === "one_time"
                     ? reminder.dueDate
                     : reminder.nextDueDate;
-                const dueDateStr = dueDate
-                  ? new Date(dueDate).toLocaleDateString("zh-CN")
-                  : "-";
+                const dueDateStr = formatReminderDateTime(dueDate ?? null);
                 const isOverdue = dueDate && dueDate < Date.now();
                 return (
                   <View

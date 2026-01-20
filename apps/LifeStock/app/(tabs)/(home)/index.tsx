@@ -1,5 +1,5 @@
 import { AddItemSheet } from "@/components/AddItemModal";
-import type { Item } from "@/db/schema";
+import type { Item, ItemType } from "@/db/schema";
 import { seedTestData } from "@/db/seed";
 import { itemService } from "@/db/services";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,8 @@ import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useFocusEffect, useNavigation, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import * as DropdownMenu from "zeego/dropdown-menu";
+
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -16,6 +18,7 @@ export default function HomeScreen() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isModalPending, setIsModalPending] = useState(false);
+  const [activeType, setActiveType] = useState<ItemType | null>(null);
 
   const loadItems = useCallback(async () => {
     const data = await itemService.getAll();
@@ -28,8 +31,8 @@ export default function HomeScreen() {
     }, [loadItems])
   );
 
-  const handleOpenAddItem = useCallback(() => {
-    // 改为设置挂起状态，由 useEffect 处理最终触发
+  const handleOpenAddItem = useCallback((type: ItemType) => {
+    setActiveType(type);
     setIsModalPending(true);
   }, []);
 
@@ -133,34 +136,73 @@ export default function HomeScreen() {
         </View>
       ),
       headerRight: () => (
-        <View className="flex-row items-center px-2">
-          {isEditMode && hasItems && (
-            <Pressable
-              className="w-9 h-9 items-center justify-center mr-1"
-              onPress={handleToggleSelectAll}
-            >
-              <Ionicons
-                name={selectedIds.size === items.length ? "checkmark-circle" : "checkmark-circle-outline"}
-                size={22}
-                color="#007AFF"
-              />
-            </Pressable>
+        <View style={{ flexDirection: 'row', width: 30, alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8, alignSelf: 'flex-end' }}>
+          {isEditMode ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {hasItems && (
+                <Pressable
+                  onPress={handleToggleSelectAll}
+                  style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginRight: 4 }}
+                >
+                  <Ionicons
+                    name={selectedIds.size === items.length ? "checkmark-circle" : "checkmark-circle-outline"}
+                    size={22}
+                    color="#007AFF"
+                  />
+                </Pressable>
+              )}
+              <Pressable
+                onPress={handleDelete}
+                style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
+                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={22}
+                  color={selectedIds.size > 0 ? "#FF3B30" : "#C7C7CC"}
+                />
+              </Pressable>
+            </View>
+          ) : (
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <Pressable
+                  className="w-9 h-9 items-center justify-center"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="add" size={28} color="#007AFF" />
+                </Pressable>
+              </DropdownMenu.Trigger>
+
+              <DropdownMenu.Content>
+                <DropdownMenu.Item key="product" onSelect={() => handleOpenAddItem("product")}>
+                  <DropdownMenu.ItemTitle>产品 / 耗材</DropdownMenu.ItemTitle>
+                  <DropdownMenu.ItemIcon ios={{ name: "cube" }} />
+                </DropdownMenu.Item>
+
+                <DropdownMenu.Item key="account" onSelect={() => handleOpenAddItem("account")}>
+                  <DropdownMenu.ItemTitle>账号信息</DropdownMenu.ItemTitle>
+                  <DropdownMenu.ItemIcon ios={{ name: "person.crop.circle" }} />
+                </DropdownMenu.Item>
+
+                <DropdownMenu.Item key="phone" onSelect={() => handleOpenAddItem("phone")}>
+                  <DropdownMenu.ItemTitle>手机号码</DropdownMenu.ItemTitle>
+                  <DropdownMenu.ItemIcon ios={{ name: "phone" }} />
+                </DropdownMenu.Item>
+
+                <DropdownMenu.Separator />
+
+                <DropdownMenu.Item key="other" onSelect={() => handleOpenAddItem("other")}>
+                  <DropdownMenu.ItemTitle>其他记录</DropdownMenu.ItemTitle>
+                  <DropdownMenu.ItemIcon ios={{ name: "ellipsis.circle" }} />
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
           )}
-          <Pressable
-            className="w-9 h-9 items-center justify-center"
-            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-            onPress={isEditMode ? handleDelete : handleOpenAddItem}
-          >
-            <Ionicons
-              name={isEditMode ? "trash-outline" : "add"}
-              size={isEditMode ? 22 : 28}
-              color={isEditMode ? (selectedIds.size > 0 ? "#FF3B30" : "#C7C7CC") : "#007AFF"}
-            />
-          </Pressable>
         </View>
       ),
     });
-  }, [navigation, isEditMode, hasItems, selectedIds.size, handleToggleEditMode, handleToggleSelectAll, handleDelete, handleOpenAddItem, loadItems]);
+  }, [navigation, isEditMode, hasItems, selectedIds.size, handleToggleEditMode, handleToggleSelectAll, handleDelete, handleOpenAddItem]);
 
   return (
     <>
@@ -297,7 +339,11 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      <AddItemSheet ref={bottomSheetRef} onClose={handleCloseAddItem} />
+      <AddItemSheet
+        ref={bottomSheetRef}
+        initialType={activeType}
+        onClose={handleCloseAddItem}
+      />
     </>
   );
 }
