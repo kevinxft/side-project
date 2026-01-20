@@ -24,6 +24,7 @@ export default function TabLayout() {
         name="(calendar)"
         options={{
           title: "日历",
+          tabBarIcon: { type: "sfSymbol", name: "calendar" },
         }}
       />
 

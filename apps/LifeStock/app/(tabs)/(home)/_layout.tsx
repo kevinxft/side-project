@@ -16,6 +16,25 @@ export default function HomeLayout() {
           headerShadowVisible: false,
         }}
       />
+      <Stack.Screen
+        name="[id]"
+        options={{
+          headerBackTitle: "返回",
+          headerTransparent: true,
+          headerBlurEffect: "systemMaterial",
+          headerShadowVisible: false,
+        }}
+      />
+      <Stack.Screen
+        name="edit/[id]"
+        options={{
+          headerTitle: "编辑物品",
+          headerBackTitle: "返回",
+          headerTransparent: true,
+          headerBlurEffect: "systemMaterial",
+          headerShadowVisible: false,
+        }}
+      />
     </Stack>
   );
 }

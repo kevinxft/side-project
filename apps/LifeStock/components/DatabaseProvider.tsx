@@ -26,19 +26,19 @@ export function DatabaseProvider({ children, fallback }: DatabaseProviderProps) 
     const { success, error } = useMigrations(db, migrations);
 
     if (error) {
-        console.error("Database migration error:", error);
-        // 可以在这里显示错误 UI
+        console.error("Database error:", error);
         return fallback ?? null;
     }
 
     if (!success) {
-        // 可以在这里显示加载 UI
         return fallback ?? null;
     }
 
     return (
-        <DatabaseContext.Provider value={{ isReady: success, error: error ?? null }}>
+        <DatabaseContext.Provider value={{ isReady: true, error: null }}>
             {children}
         </DatabaseContext.Provider>
     );
 }
+
+

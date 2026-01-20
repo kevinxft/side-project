@@ -1,11 +1,9 @@
-import type { ItemKind } from "@/db/schema";
-import { itemService } from "@/db/services";
+import type { ItemType, RecurrenceUnit, ReminderType } from "@/db/schema";
+import { itemService, reminderService } from "@/db/services";
 import { Ionicons } from "@expo/vector-icons";
-import { BottomSheetModal, BottomSheetScrollView, BottomSheetView } from "@gorhom/bottom-sheet";
+import { BottomSheetBackdrop, BottomSheetBackdropProps, BottomSheetModal, BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import React, { forwardRef, useCallback, useMemo, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
     Pressable,
     ScrollView,
     Text,
@@ -13,17 +11,22 @@ import {
     View,
 } from "react-native";
 
-const KIND_CONFIG: Record<ItemKind, { label: string; icon: string; color: string }> = {
-    stock: { label: "库存", icon: "cube-outline", color: "#3B82F6" },
-    card: { label: "卡券", icon: "card-outline", color: "#8B5CF6" },
+const TYPE_CONFIG: Record<ItemType, { label: string; icon: string; color: string }> = {
+    product: { label: "产品", icon: "cube-outline", color: "#3B82F6" },
+    account: { label: "账号", icon: "card-outline", color: "#8B5CF6" },
     phone: { label: "号码", icon: "call-outline", color: "#10B981" },
+    supply: { label: "耗材", icon: "brush-outline", color: "#F59E0B" },
+    other: { label: "其他", icon: "ellipsis-horizontal-outline", color: "#6B7280" },
 };
 
 const COMMON_UNITS = ["个", "件", "包", "盒", "瓶", "袋", "支", "片"];
-const CARRIERS = ["中国移动", "中国联通", "中国电信", "中国广电"];
-const BILLING_DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
-
-type CardMode = "balance" | "times";
+const CARRIERS = ["中国移动", "中国联通", "中国电信", "中国广电", "Ultra Mobile", "giffgaff", "RedteaGO"];
+const RECURRENCE_UNITS: { label: string; value: RecurrenceUnit }[] = [
+    { label: "天", value: "day" },
+    { label: "周", value: "week" },
+    { label: "月", value: "month" },
+    { label: "年", value: "year" },
+];
 
 interface AddItemSheetProps {
     onClose: () => void;
@@ -31,29 +34,49 @@ interface AddItemSheetProps {
 
 export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
     ({ onClose }, ref) => {
-        const [kind, setKind] = useState<ItemKind>("stock");
+        const [type, setType] = useState<ItemType>("product");
         const [name, setName] = useState("");
         const [icon, setIcon] = useState("📦");
         const [notes, setNotes] = useState("");
 
+        // Product/Supply fields
         const [quantity, setQuantity] = useState("");
         const [unit, setUnit] = useState("个");
         const [minQuantity, setMinQuantity] = useState("");
         const [location, setLocation] = useState("");
 
-        const [cardMode, setCardMode] = useState<CardMode>("balance");
+        // Account fields
+        const [accountType, setAccountType] = useState<"balance" | "times" | "none">("none");
         const [balance, setBalance] = useState("");
         const [totalTimes, setTotalTimes] = useState("");
         const [remainingTimes, setRemainingTimes] = useState("");
         const [merchantName, setMerchantName] = useState("");
-        const [merchantPhone, setMerchantPhone] = useState("");
 
+        // Phone fields
         const [phoneNumber, setPhoneNumber] = useState("");
         const [carrier, setCarrier] = useState("");
-        const [monthlyFee, setMonthlyFee] = useState("");
-        const [billingDate, setBillingDate] = useState<number | null>(null);
 
-        const snapPoints = useMemo(() => ["95%"], []);
+        // Reminder fields
+        const [hasReminder, setHasReminder] = useState(false);
+        const [reminderType, setReminderType] = useState<ReminderType>("one_time");
+        const [interval, setInterval] = useState("1");
+        const [recUnit, setRecUnit] = useState<RecurrenceUnit>("month");
+        const [remindDays, setRemindDays] = useState("0");
+        const [dueDate, setDueDate] = useState<number | null>(null);
+
+        const snapPoints = useMemo(() => ["90%"], []);
+
+        const renderBackdrop = useCallback(
+            (props: BottomSheetBackdropProps) => (
+                <BottomSheetBackdrop
+                    {...props}
+                    disappearsOnIndex={-1}
+                    appearsOnIndex={0}
+                    opacity={0.4}
+                />
+            ),
+            []
+        );
 
         const handleClose = useCallback(() => {
             setName("");
@@ -65,11 +88,9 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
             setTotalTimes("");
             setRemainingTimes("");
             setMerchantName("");
-            setMerchantPhone("");
             setPhoneNumber("");
             setCarrier("");
-            setMonthlyFee("");
-            setBillingDate(null);
+            setHasReminder(false);
             onClose();
         }, [onClose]);
 
@@ -77,59 +98,69 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
             if (!name.trim()) return;
 
             try {
-                if (kind === "stock") {
-                    await itemService.create({
-                        kind: "stock",
-                        name: name.trim(),
-                        icon,
-                        notes: notes.trim() || null,
-                        quantity: quantity ? parseFloat(quantity) : null,
-                        unit: unit || null,
-                        minQuantity: minQuantity ? parseFloat(minQuantity) : null,
-                        location: location.trim() || null,
-                    });
-                } else if (kind === "card") {
-                    await itemService.create({
-                        kind: "card",
-                        name: name.trim(),
-                        icon,
-                        notes: notes.trim() || null,
-                        balance: cardMode === "balance" && balance ? parseFloat(balance) : null,
-                        totalTimes: cardMode === "times" && totalTimes ? parseInt(totalTimes) : null,
-                        remainingTimes: cardMode === "times" && remainingTimes ? parseInt(remainingTimes) : null,
-                        merchantName: merchantName.trim() || null,
-                        merchantPhone: merchantPhone.trim() || null,
-                    });
-                } else if (kind === "phone") {
-                    await itemService.create({
-                        kind: "phone",
-                        name: name.trim(),
-                        icon,
-                        notes: notes.trim() || null,
-                        phoneNumber: phoneNumber.trim() || null,
-                        carrier: carrier || null,
-                        monthlyFee: monthlyFee ? parseFloat(monthlyFee) : null,
-                        billingDate: billingDate,
+                const metadata: any = {};
+                if (type === "product" || type === "supply") {
+                    metadata.quantity = quantity ? parseFloat(quantity) : null;
+                    metadata.unit = unit || null;
+                    metadata.minQuantity = minQuantity ? parseFloat(minQuantity) : null;
+                    metadata.location = location.trim() || null;
+                } else if (type === "account") {
+                    if (accountType === "balance") metadata.balance = parseFloat(balance);
+                    else if (accountType === "times") {
+                        metadata.totalTimes = parseInt(totalTimes);
+                        metadata.remainingTimes = parseInt(remainingTimes);
+                    }
+                    metadata.merchantName = merchantName.trim() || null;
+                } else if (type === "phone") {
+                    metadata.phoneNumber = phoneNumber.trim() || null;
+                    metadata.carrier = carrier || null;
+                }
+
+                const newItem = await itemService.create({
+                    type,
+                    name: name.trim(),
+                    icon,
+                    notes: notes.trim() || null,
+                    metadata: JSON.stringify(metadata),
+                    archived: 0,
+                });
+
+                if (hasReminder) {
+                    await reminderService.create({
+                        itemId: newItem.id,
+                        reminderType,
+                        title: reminderType === "one_time" ? "到期提醒" : "循环任务",
+                        description: notes.trim() || null,
+                        dueDate: reminderType === "one_time" ? dueDate || Date.now() : null,
+                        recurrenceInterval: reminderType === "recurring" ? parseInt(interval) : null,
+                        recurrenceUnit: reminderType === "recurring" ? recUnit : null,
+                        startDate: reminderType === "recurring" ? Date.now() : null,
+                        advanceDays: parseInt(remindDays) || 0,
+                        isActive: 1,
                     });
                 }
+
                 handleClose();
             } catch (error) {
                 console.error("保存失败:", error);
             }
         };
 
-        const canSubmit = name.trim().length > 0;
-
-        const handleKindChange = (newKind: ItemKind) => {
-            setKind(newKind);
-            if (newKind === "stock") setIcon("📦");
-            else if (newKind === "card") setIcon("💳");
-            else if (newKind === "phone") setIcon("📱");
+        const handleTypeChange = (newType: ItemType) => {
+            setType(newType);
+            const config = TYPE_CONFIG[newType];
+            if (newType === "product") setIcon("📦");
+            else if (newType === "account") setIcon("💳");
+            else if (newType === "phone") setIcon("📱");
+            else if (newType === "supply") setIcon("🪥");
+            else setIcon("📁");
         };
 
+        const canSubmit = name.trim().length > 0;
+
         const FormRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
-            <View className="flex-row items-center justify-between px-4 py-4 bg-white/50 rounded-2xl border border-white mb-3">
-                <Text className="text-[15px] font-bold text-gray-800">{label}</Text>
+            <View className="flex-row items-center justify-between px-4 py-3 h-12">
+                <Text className="text-[17px] text-black">{label}</Text>
                 {children}
             </View>
         );
@@ -145,16 +176,16 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
             placeholder: string;
             suffix?: string;
         }) => (
-            <View className="flex-row items-center bg-white px-4 py-2 rounded-2xl shadow-sm border border-gray-100">
+            <View className="flex-row items-center">
                 <TextInput
-                    className="text-[16px] font-bold text-black text-right min-w-[60px]"
+                    className="text-[17px] text-black text-right min-w-[40px]"
                     placeholder={placeholder}
-                    placeholderTextColor="#AEAEB2"
+                    placeholderTextColor="#C7C7CC"
                     keyboardType="decimal-pad"
                     value={value}
                     onChangeText={onChange}
                 />
-                {suffix && <Text className="ml-2 text-gray-400 font-bold">{suffix}</Text>}
+                {suffix && <Text className="ml-1 text-[17px] text-black">{suffix}</Text>}
             </View>
         );
 
@@ -163,283 +194,311 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
                 ref={ref}
                 snapPoints={snapPoints}
                 enablePanDownToClose
+                enableDynamicSizing={false}
+                backdropComponent={renderBackdrop}
                 backgroundStyle={{ backgroundColor: "#F2F2F7" }}
-                handleIndicatorStyle={{ backgroundColor: "#C7C7CC", width: 36 }}
+                handleIndicatorStyle={{ backgroundColor: "#C7C7CC", width: 36, marginTop: 6 }}
             >
                 {/* Header */}
-                <View className="flex-row items-center justify-between px-6 py-3">
-                    <Pressable
-                        onPress={handleClose}
-                        className="px-4 h-10 items-center justify-center rounded-full bg-white shadow-sm border border-gray-100"
-                    >
-                        <Text className="text-[15px] font-bold text-black">取消</Text>
+                <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-200/50 bg-[#F2F2F7]">
+                    <Pressable onPress={handleClose} className="px-2 py-2">
+                        <Text className="text-[17px] text-[#007AFF]">取消</Text>
                     </Pressable>
 
-                    <Text className="text-[17px] font-bold text-black">添加物品</Text>
+                    <Text className="text-[17px] font-bold text-black">新物品</Text>
 
                     <Pressable
                         onPress={handleAddItem}
-                        className={`px-4 h-10 items-center justify-center rounded-full shadow-sm border border-gray-100 ${canSubmit ? "bg-white" : "bg-gray-50/50"}`}
+                        className="px-2 py-2"
                         disabled={!canSubmit}
                     >
-                        <Text className={`text-[15px] font-bold ${canSubmit ? "text-[#007AFF]" : "text-[#AEAEB2]"}`}>保存</Text>
+                        <Text className={`text-[17px] font-bold ${canSubmit ? "text-[#007AFF]" : "text-gray-300"}`}>保存</Text>
                     </Pressable>
                 </View>
 
                 <BottomSheetScrollView
-                    contentContainerStyle={{ paddingTop: 16, paddingBottom: 80 }}
+                    contentContainerStyle={{ paddingTop: 20, paddingBottom: 80 }}
                     keyboardShouldPersistTaps="handled"
                 >
-                        {/* 类型切换器 */}
-                        <View className="mx-6 mb-8">
-                            <View className="flex-row bg-[#E3E3E8] rounded-[20px] p-1">
-                                {(Object.keys(KIND_CONFIG) as ItemKind[]).map((k) => {
-                                    const config = KIND_CONFIG[k];
-                                    const isActive = kind === k;
-                                    return (
-                                        <Pressable
-                                            key={k}
-                                            onPress={() => handleKindChange(k)}
-                                            className={`flex-1 flex-row items-center justify-center py-2.5 rounded-[15px] ${isActive ? "bg-white shadow-md" : ""}`}
+                    {/* 名称卡片 */}
+                    <View className="mx-4 mb-6 bg-white rounded-2xl overflow-hidden">
+                        <View className="flex-row items-center px-4 py-3 border-b border-gray-100">
+                            <View className="w-10 h-10 rounded-full bg-gray-50 items-center justify-center mr-3 border border-gray-100">
+                                <Text className="text-[22px]">{icon}</Text>
+                            </View>
+                            <TextInput
+                                className="flex-1 text-[17px] font-medium text-black h-10"
+                                placeholder="物品名称"
+                                placeholderTextColor="#C7C7CC"
+                                value={name}
+                                onChangeText={setName}
+                                clearButtonMode="while-editing"
+                            />
+                        </View>
+                        <View className="flex-row items-start px-4 py-3 h-24">
+                            <Ionicons name="documents-outline" size={20} color="#C7C7CC" style={{ marginTop: 2, marginRight: 10 }} />
+                            <TextInput
+                                className="flex-1 text-[15px] text-black leading-5 pt-0"
+                                placeholder="添加备注..."
+                                placeholderTextColor="#C7C7CC"
+                                value={notes}
+                                onChangeText={setNotes}
+                                multiline
+                                textAlignVertical="top"
+                            />
+                        </View>
+                    </View>
+
+                    {/* 类型选择 */}
+                    <View className="mb-6">
+                        <Text className="px-5 text-[13px] font-medium text-gray-500 mb-2 uppercase tracking-wide">类型</Text>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+                        >
+                            {(Object.keys(TYPE_CONFIG) as ItemType[]).map((t) => {
+                                const config = TYPE_CONFIG[t];
+                                const isActive = type === t;
+                                return (
+                                    <Pressable
+                                        key={t}
+                                        onPress={() => handleTypeChange(t)}
+                                        className={`flex-row items-center px-4 py-2.5 rounded-full border ${isActive ? "bg-black border-black" : "bg-white border-white"}`}
+                                        style={!isActive ? { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 } : {}}
+                                    >
+                                        <Ionicons
+                                            name={config.icon as any}
+                                            size={16}
+                                            color={isActive ? "#FFF" : "#636366"}
+                                        />
+                                        <Text
+                                            className={`ml-1.5 font-medium text-[14px] ${isActive ? "text-white" : "text-[#1C1C1E]"}`}
                                         >
-                                            <Ionicons
-                                                name={config.icon as any}
-                                                size={16}
-                                                color={isActive ? config.color : "#636366"}
-                                            />
-                                            <Text
-                                                className={`ml-2 font-bold text-[13px] ${isActive ? "text-black" : "text-[#636366]"}`}
+                                            {config.label}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+
+                    {/* Product/Supply Form */}
+                    {(type === "product" || type === "supply") && (
+                        <View className="mx-4 mb-6 bg-white rounded-2xl overflow-hidden">
+                            <View className="border-b border-gray-100">
+                                <FormRow label="当前库存">
+                                    <NumberInput value={quantity} onChange={setQuantity} placeholder="0" suffix={unit} />
+                                </FormRow>
+                            </View>
+                            <View className="border-b border-gray-100 flex-row items-center justify-between px-4 py-3 bg-white">
+                                <Text className="text-[17px] text-black">单位</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1 ml-4" contentContainerStyle={{ justifyContent: 'flex-end', paddingRight: 0 }}>
+                                    <View className="flex-row gap-2">
+                                        {COMMON_UNITS.map((u) => (
+                                            <Pressable
+                                                key={u}
+                                                onPress={() => setUnit(u)}
+                                                className={`px-3 py-1.5 rounded-lg border ${unit === u ? "bg-blue-50 border-blue-500" : "bg-gray-50 border-transparent"}`}
                                             >
-                                                {config.label}
-                                            </Text>
-                                        </Pressable>
-                                    );
-                                })}
+                                                <Text className={`text-[13px] font-medium ${unit === u ? "text-blue-600" : "text-gray-600"}`}>{u}</Text>
+                                            </Pressable>
+                                        ))}
+                                    </View>
+                                </ScrollView>
+                            </View>
+                            <View>
+                                <FormRow label="存放位置">
+                                    <TextInput
+                                        className="text-[17px] text-black text-right flex-1 ml-4"
+                                        placeholder="未设置"
+                                        placeholderTextColor="#C7C7CC"
+                                        value={location}
+                                        onChangeText={setLocation}
+                                    />
+                                </FormRow>
                             </View>
                         </View>
+                    )}
 
-                        {/* 名称卡片 */}
-                        <View className="mx-6 mb-8">
-                            <View className="bg-white rounded-[32px] shadow-sm overflow-hidden border border-white">
-                                <View className="flex-row items-center px-6 py-6 border-b border-[#F2F2F7]">
-                                    <View className="w-12 h-12 rounded-[18px] items-center justify-center mr-4 bg-[#F2F2F7]">
-                                        <Text className="text-2xl">{icon}</Text>
-                                    </View>
+                    {/* Phone Form */}
+                    {type === "phone" && (
+                        <View className="mx-4 mb-6">
+                            <View className="bg-white rounded-2xl overflow-hidden mb-4">
+                                <FormRow label="手机号码">
                                     <TextInput
-                                        className="flex-1 text-[22px] font-bold text-black"
-                                        placeholder="物品名称"
-                                        placeholderTextColor="#AEAEB2"
-                                        value={name}
-                                        onChangeText={setName}
+                                        className="text-[17px] text-black text-right flex-1 ml-4"
+                                        placeholder="输入号码"
+                                        placeholderTextColor="#C7C7CC"
+                                        value={phoneNumber}
+                                        onChangeText={setPhoneNumber}
+                                        keyboardType="phone-pad"
                                     />
-                                </View>
-                                <View className="flex-row items-center px-8 py-5">
-                                    <Ionicons name="pencil-outline" size={18} color="#AEAEB2" />
-                                    <TextInput
-                                        className="flex-1 text-[15px] text-[#2C2C2E] ml-3"
-                                        placeholder="点击添加备注..."
-                                        placeholderTextColor="#AEAEB2"
-                                        value={notes}
-                                        onChangeText={setNotes}
-                                        multiline
-                                    />
-                                </View>
+                                </FormRow>
                             </View>
+
+                            <Text className="px-5 text-[13px] font-medium text-gray-500 mb-2 uppercase tracking-wide">运营商</Text>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+                            >
+                                {CARRIERS.map((c) => (
+                                    <Pressable
+                                        key={c}
+                                        onPress={() => setCarrier(c)}
+                                        className={`px-4 py-2 rounded-xl border ${carrier === c ? "bg-white border-green-500 shadow-sm" : "bg-white border-transparent"}`}
+                                        style={carrier !== c ? { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 } : {}}
+                                    >
+                                        <Text className={`text-[14px] font-medium ${carrier === c ? "text-green-600" : "text-gray-800"}`}>{c}</Text>
+                                    </Pressable>
+                                ))}
+                            </ScrollView>
                         </View>
+                    )}
 
-                        {/* Stock 表单 */}
-                        {kind === "stock" && (
-                            <View className="mx-6 mb-6">
-                                <View className="bg-white/60 rounded-[32px] border border-white shadow-sm p-4">
-                                    <FormRow label="当前库存">
-                                        <NumberInput
-                                            value={quantity}
-                                            onChange={setQuantity}
-                                            placeholder="0"
-                                            suffix={unit}
-                                        />
-                                    </FormRow>
-
-                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-                                        <View className="flex-row gap-2.5 px-1">
-                                            {COMMON_UNITS.map((u) => (
-                                                <Pressable
-                                                    key={u}
-                                                    onPress={() => setUnit(u)}
-                                                    className={`px-5 py-2.5 rounded-2xl border ${unit === u ? "bg-blue-500 border-blue-400 shadow-md" : "bg-white border-gray-100"}`}
-                                                >
-                                                    <Text className={`text-[13px] font-bold ${unit === u ? "text-white" : "text-gray-600"}`}>
-                                                        {u}
-                                                    </Text>
-                                                </Pressable>
-                                            ))}
-                                        </View>
-                                    </ScrollView>
-
-                                    <FormRow label="警戒库存">
-                                        <NumberInput
-                                            value={minQuantity}
-                                            onChange={setMinQuantity}
-                                            placeholder="低于提醒"
-                                            suffix={unit}
-                                        />
-                                    </FormRow>
-
-                                    <FormRow label="存放位置">
-                                        <TextInput
-                                            className="text-[15px] text-black text-right flex-1 ml-4"
-                                            placeholder="哪儿找它？"
-                                            placeholderTextColor="#AEAEB2"
-                                            value={location}
-                                            onChangeText={setLocation}
-                                        />
-                                    </FormRow>
-                                </View>
+                    {/* Account Form */}
+                    {type === "account" && (
+                        <View className="mx-4 mb-6">
+                            <View className="flex-row bg-gray-200/50 p-1 rounded-xl mb-4">
+                                {(["none", "balance", "times"] as const).map(m => (
+                                    <Pressable
+                                        key={m}
+                                        onPress={() => setAccountType(m)}
+                                        className={`flex-1 py-1.5 rounded-[10px] items-center justify-center ${accountType === m ? "bg-white shadow-sm" : ""}`}
+                                    >
+                                        <Text className={`text-[13px] font-semibold ${accountType === m ? "text-black" : "text-gray-500"}`}>
+                                            {m === "none" ? "通用" : m === "balance" ? "余额" : "计次"}
+                                        </Text>
+                                    </Pressable>
+                                ))}
                             </View>
-                        )}
 
-                        {/* Card 表单 */}
-                        {kind === "card" && (
-                            <View className="mx-6 mb-6">
-                                <View className="bg-white/60 rounded-[32px] border border-white shadow-sm p-4">
-                                    <View className="flex-row bg-[#E3E3E8] rounded-2xl p-1 mb-4">
-                                        <Pressable
-                                            onPress={() => setCardMode("balance")}
-                                            className={`flex-1 py-2.5 rounded-xl ${cardMode === "balance" ? "bg-white shadow-sm" : ""}`}
-                                        >
-                                            <Text className={`text-center text-[13px] font-bold ${cardMode === "balance" ? "text-black" : "text-gray-500"}`}>
-                                                储值卡
-                                            </Text>
-                                        </Pressable>
-                                        <Pressable
-                                            onPress={() => setCardMode("times")}
-                                            className={`flex-1 py-2.5 rounded-xl ${cardMode === "times" ? "bg-white shadow-sm" : ""}`}
-                                        >
-                                            <Text className={`text-center text-[13px] font-bold ${cardMode === "times" ? "text-black" : "text-gray-500"}`}>
-                                                次卡
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-
-                                    {cardMode === "balance" && (
+                            <View className="bg-white rounded-2xl overflow-hidden">
+                                {accountType === "balance" && (
+                                    <View className="border-b border-gray-100">
                                         <FormRow label="当前余额">
-                                            <NumberInput
-                                                value={balance}
-                                                onChange={setBalance}
-                                                placeholder="0.00"
-                                                suffix="元"
-                                            />
-                                        </FormRow>
-                                    )}
-
-                                    {cardMode === "times" && (
-                                        <>
-                                            <FormRow label="总次数">
-                                                <NumberInput
-                                                    value={totalTimes}
-                                                    onChange={setTotalTimes}
-                                                    placeholder="0"
-                                                    suffix="次"
-                                                />
-                                            </FormRow>
-                                            <FormRow label="剩余次数">
-                                                <NumberInput
-                                                    value={remainingTimes}
-                                                    onChange={setRemainingTimes}
-                                                    placeholder="0"
-                                                    suffix="次"
-                                                />
-                                            </FormRow>
-                                        </>
-                                    )}
-
-                                    <View className="mt-2 pt-4 border-t border-gray-100">
-                                        <Text className="text-[13px] font-bold text-gray-400 mb-3 px-2">商家信息</Text>
-                                        <FormRow label="商家名称">
-                                            <TextInput
-                                                className="text-[15px] text-black text-right flex-1 ml-4"
-                                                placeholder="输入商家名称"
-                                                placeholderTextColor="#AEAEB2"
-                                                value={merchantName}
-                                                onChangeText={setMerchantName}
-                                            />
-                                        </FormRow>
-                                        <FormRow label="商家电话">
-                                            <TextInput
-                                                className="text-[15px] text-black text-right flex-1 ml-4"
-                                                placeholder="输入联系电话"
-                                                placeholderTextColor="#AEAEB2"
-                                                value={merchantPhone}
-                                                onChangeText={setMerchantPhone}
-                                                keyboardType="phone-pad"
-                                            />
+                                            <NumberInput value={balance} onChange={setBalance} placeholder="0.00" suffix="¥" />
                                         </FormRow>
                                     </View>
-                                </View>
-                            </View>
-                        )}
-
-                        {/* Phone 表单 */}
-                        {kind === "phone" && (
-                            <View className="mx-6 mb-6">
-                                <View className="bg-white/60 rounded-[32px] border border-white shadow-sm p-4">
-                                    <FormRow label="手机号码">
+                                )}
+                                {accountType === "times" && (
+                                    <>
+                                        <View className="border-b border-gray-100">
+                                            <FormRow label="总次数">
+                                                <NumberInput value={totalTimes} onChange={setTotalTimes} placeholder="0" suffix="次" />
+                                            </FormRow>
+                                        </View>
+                                        <View className="border-b border-gray-100">
+                                            <FormRow label="剩余次数">
+                                                <NumberInput value={remainingTimes} onChange={setRemainingTimes} placeholder="0" suffix="次" />
+                                            </FormRow>
+                                        </View>
+                                    </>
+                                )}
+                                <View>
+                                    <FormRow label="商家名称">
                                         <TextInput
-                                            className="text-[16px] font-bold text-black text-right flex-1 ml-4"
-                                            placeholder="输入手机号"
-                                            placeholderTextColor="#AEAEB2"
-                                            value={phoneNumber}
-                                            onChangeText={setPhoneNumber}
-                                            keyboardType="phone-pad"
+                                            className="text-[17px] text-black text-right flex-1 ml-4"
+                                            placeholder="未设置"
+                                            placeholderTextColor="#C7C7CC"
+                                            value={merchantName}
+                                            onChangeText={setMerchantName}
                                         />
                                     </FormRow>
-
-                                    <Text className="text-[13px] font-bold text-gray-400 mb-3 px-2">运营商</Text>
-                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-                                        <View className="flex-row gap-2.5 px-1">
-                                            {CARRIERS.map((c) => (
-                                                <Pressable
-                                                    key={c}
-                                                    onPress={() => setCarrier(c)}
-                                                    className={`px-5 py-2.5 rounded-2xl border ${carrier === c ? "bg-green-500 border-green-400 shadow-md" : "bg-white border-gray-100"}`}
-                                                >
-                                                    <Text className={`text-[13px] font-bold ${carrier === c ? "text-white" : "text-gray-600"}`}>
-                                                        {c}
-                                                    </Text>
-                                                </Pressable>
-                                            ))}
-                                        </View>
-                                    </ScrollView>
-
-                                    <FormRow label="月租费用">
-                                        <NumberInput
-                                            value={monthlyFee}
-                                            onChange={setMonthlyFee}
-                                            placeholder="0.00"
-                                            suffix="元/月"
-                                        />
-                                    </FormRow>
-
-                                    <Text className="text-[13px] font-bold text-gray-400 mb-3 px-2 mt-2">扣费日</Text>
-                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
-                                        <View className="flex-row gap-2 px-1">
-                                            {BILLING_DAYS.map((day) => (
-                                                <Pressable
-                                                    key={day}
-                                                    onPress={() => setBillingDate(day)}
-                                                    className={`w-10 h-10 rounded-full items-center justify-center border ${billingDate === day ? "bg-green-500 border-green-400 shadow-md" : "bg-white border-gray-100"}`}
-                                                >
-                                                    <Text className={`text-[13px] font-bold ${billingDate === day ? "text-white" : "text-gray-600"}`}>
-                                                        {day}
-                                                    </Text>
-                                                </Pressable>
-                                            ))}
-                                        </View>
-                                    </ScrollView>
                                 </View>
                             </View>
+                        </View>
+                    )}
+
+                    {/* Reminder Settings */}
+                    <View className="mx-4 mb-6">
+                        <Pressable
+                            onPress={() => setHasReminder(!hasReminder)}
+                            className="flex-row items-center justify-between px-4 py-3 bg-white rounded-2xl"
+                        >
+                            <View className="flex-row items-center">
+                                <View className={`w-8 h-8 rounded-lg items-center justify-center mr-3 ${hasReminder ? "bg-blue-500" : "bg-gray-100"}`}>
+                                    <Ionicons name="notifications" size={18} color={hasReminder ? "white" : "#8E8E93"} />
+                                </View>
+                                <Text className="text-[17px] text-black">
+                                    提醒
+                                </Text>
+                            </View>
+                            <View className={`w-[51px] h-[31px] rounded-full px-[2px] justify-center ${hasReminder ? "bg-[#34C759]" : "bg-[#E9E9EA]"}`}>
+                                <View className={`w-[27px] h-[27px] rounded-full bg-white shadow-sm transition-all duration-200 ${hasReminder ? "self-end" : "self-start"}`} />
+                            </View>
+                        </Pressable>
+
+                        {hasReminder && (
+                            <View className="mt-2 bg-white rounded-2xl overflow-hidden p-4">
+                                <View className="flex-row bg-gray-100 rounded-lg p-0.5 mb-4">
+                                    <Pressable
+                                        onPress={() => setReminderType("one_time")}
+                                        className={`flex-1 py-1.5 rounded-[7px] items-center justify-center ${reminderType === "one_time" ? "bg-white shadow-sm" : ""}`}
+                                    >
+                                        <Text className={`text-[13px] font-semibold ${reminderType === "one_time" ? "text-black" : "text-gray-500"}`}>
+                                            一次性
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={() => setReminderType("recurring")}
+                                        className={`flex-1 py-1.5 rounded-[7px] items-center justify-center ${reminderType === "recurring" ? "bg-white shadow-sm" : ""}`}
+                                    >
+                                        <Text className={`text-[13px] font-semibold ${reminderType === "recurring" ? "text-black" : "text-gray-500"}`}>
+                                            重复
+                                        </Text>
+                                    </Pressable>
+                                </View>
+
+                                {reminderType === "recurring" ? (
+                                    <View className="border-b border-gray-100 pb-3 mb-3">
+                                        <FormRow label="复发频率">
+                                            <View className="flex-row items-center">
+                                                <NumberInput value={interval} onChange={setInterval} placeholder="1" />
+                                                <Text className="mx-2 text-gray-400 font-medium text-[15px]">/</Text>
+                                                <View className="flex-row bg-gray-100 rounded-lg p-0.5">
+                                                    {RECURRENCE_UNITS.map(u => (
+                                                        <Pressable
+                                                            key={u.value}
+                                                            onPress={() => setRecUnit(u.value)}
+                                                            className={`px-3 py-1 rounded-md ${recUnit === u.value ? "bg-white shadow-sm" : ""}`}
+                                                        >
+                                                            <Text className={`text-[12px] font-medium ${recUnit === u.value ? "text-black" : "text-gray-500"}`}>
+                                                                {u.label}
+                                                            </Text>
+                                                        </Pressable>
+                                                    ))}
+                                                </View>
+                                            </View>
+                                        </FormRow>
+                                    </View>
+                                ) : (
+                                    <View className="border-b border-gray-100 pb-3 mb-3">
+                                        <FormRow label="到期日期">
+                                            <Pressable
+                                                onPress={() => {
+                                                    const d = new Date();
+                                                    d.setMonth(d.getMonth() + 1);
+                                                    setDueDate(d.getTime());
+                                                }}
+                                                className="bg-gray-100 px-3 py-1.5 rounded-lg"
+                                            >
+                                                <Text className={`text-[15px] ${dueDate ? "text-blue-600" : "text-gray-400"}`}>
+                                                    {dueDate ? new Date(dueDate).toLocaleDateString() : "选择日期"}
+                                                </Text>
+                                            </Pressable>
+                                        </FormRow>
+                                    </View>
+                                )}
+
+                                <FormRow label="提前提醒">
+                                    <NumberInput value={remindDays} onChange={setRemindDays} placeholder="0" suffix="天" />
+                                </FormRow>
+                            </View>
                         )}
-                    </BottomSheetScrollView>
+                    </View>
+                </BottomSheetScrollView>
             </BottomSheetModal>
         );
     }

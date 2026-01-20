@@ -1,16 +1,20 @@
-import type { Item } from "@/db/schema";
-import { itemService } from "@/db/services";
+import type { Item, Reminder } from "@/db/schema";
+import { reminderService } from "@/db/services";
 import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
+import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
+
 
 // ============= 日期工具函数 =============
 function formatDate(timestamp: number): string {
@@ -36,17 +40,19 @@ function getStatusColor(daysRemaining: number): { bg: string; text: string } {
   }
 }
 
-function getStatusText(daysRemaining: number): string {
+function getStatusText(daysRemaining: number, type: string): string {
+  const action = type === "recurring" ? "操作" : "到期";
   if (daysRemaining < 0) {
-    return `已过期 ${Math.abs(daysRemaining)} 天`;
+    return `已逾期 ${Math.abs(daysRemaining)} 天`;
   } else if (daysRemaining === 0) {
-    return "今天到期";
+    return `今天${action}`;
   } else if (daysRemaining === 1) {
-    return "明天到期";
+    return `明天${action}`;
   } else {
-    return `${daysRemaining} 天后到期`;
+    return `${daysRemaining} 天后${action}`;
   }
 }
+
 
 // ============= 日历组件 =============
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
@@ -142,12 +148,20 @@ function Calendar({ selectedDate, onSelectDate, markedDates }: CalendarProps) {
 
   const isSelectedToday = useMemo(() => {
     const today = new Date();
-    return (
-      selectedDate.getDate() === today.getDate() &&
-      selectedDate.getMonth() === today.getMonth() &&
-      selectedDate.getFullYear() === today.getFullYear()
-    );
+    return selectedDate.toDateString() === today.toDateString();
   }, [selectedDate]);
+
+  // 判断当前显示的月份是否是今天所在的月份
+  const isViewingCurrentMonth = useMemo(() => {
+    const today = new Date();
+    return (
+      currentMonth.getMonth() === today.getMonth() &&
+      currentMonth.getFullYear() === today.getFullYear()
+    );
+  }, [currentMonth]);
+
+  // 只要不是选中今天，或者虽然选中今天但视图不在本月，就显示“今日”按钮
+  const showTodayButton = !isSelectedToday || !isViewingCurrentMonth;
 
   const isToday = (day: number) => {
     const today = new Date();
@@ -204,7 +218,7 @@ function Calendar({ selectedDate, onSelectDate, markedDates }: CalendarProps) {
         </View>
 
         <View style={styles.navRight}>
-          {!isSelectedToday && (
+          {showTodayButton && (
             <Pressable onPress={handleGoToToday} style={styles.todayButton}>
               <Text style={styles.todayButtonText}>今日</Text>
             </Pressable>
@@ -353,25 +367,30 @@ function Calendar({ selectedDate, onSelectDate, markedDates }: CalendarProps) {
 }
 
 // ============= 主页面 =============
+export type ReminderWithItem = Reminder & { item: Item };
+
 export default function CalendarScreen() {
-  const [items, setItems] = useState<Item[]>([]);
+  const [remindersList, setRemindersList] = useState<ReminderWithItem[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const loadItems = useCallback(async () => {
-    const data = await itemService.getWithExpiry();
-    setItems(data);
+  const loadReminders = useCallback(async () => {
+    const data = await reminderService.getAllActive();
+    setRemindersList(data);
   }, []);
 
-  useEffect(() => {
-    loadItems();
-  }, [loadItems]);
+  useFocusEffect(
+    useCallback(() => {
+      loadReminders();
+    }, [loadReminders])
+  );
 
-  // 计算有物品到期的日期集合
+  // 计算有任务的日期集合
   const markedDates = useMemo(() => {
     const dates = new Set<string>();
-    items.forEach((item) => {
-      if (item.expiryDate) {
-        const date = new Date(item.expiryDate);
+    remindersList.forEach((r) => {
+      const targetDate = r.reminderType === "one_time" ? r.dueDate : r.nextDueDate;
+      if (targetDate) {
+        const date = new Date(targetDate);
         const dateStr = `${date.getFullYear()}-${String(
           date.getMonth() + 1
         ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -379,25 +398,40 @@ export default function CalendarScreen() {
       }
     });
     return dates;
-  }, [items]);
+  }, [remindersList]);
 
-  // 过滤选中日期的物品
-  const filteredItems = useMemo(() => {
+  // 过滤选中日期的提醒
+  const filteredReminders = useMemo(() => {
     const selectedDateStr = `${selectedDate.getFullYear()}-${String(
       selectedDate.getMonth() + 1
     ).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
 
-    return items.filter((item) => {
-      if (!item.expiryDate) return false;
-      const date = new Date(item.expiryDate);
+    return remindersList.filter((r) => {
+      const targetDate = r.reminderType === "one_time" ? r.dueDate : r.nextDueDate;
+      if (!targetDate) return false;
+      const date = new Date(targetDate);
       const dateStr = `${date.getFullYear()}-${String(
         date.getMonth() + 1
       ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
       return dateStr === selectedDateStr;
     });
-  }, [items, selectedDate]);
+  }, [remindersList, selectedDate]);
 
-  const hasItems = filteredItems.length > 0;
+  const handleComplete = async (reminderId: string, title: string) => {
+    Alert.alert("确认完成", `确定已完成 "${title}" 操作吗？`, [
+      { text: "取消", style: "cancel" },
+      {
+        text: "确定",
+        onPress: async () => {
+          await reminderService.complete(reminderId);
+          loadReminders();
+        },
+      },
+    ]);
+  };
+
+  const hasItems = filteredReminders.length > 0;
+
 
   // 格式化选中日期用于显示
   const selectedDateDisplay = `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日`;
@@ -416,45 +450,58 @@ export default function CalendarScreen() {
 
       {/* 最近到期的东西 */}
       <View style={styles.listSection}>
-        <Text style={styles.sectionTitle}>{selectedDateDisplay} 到期</Text>
+        <Text style={styles.sectionTitle}>{selectedDateDisplay} 事项</Text>
 
         {!hasItems ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📅</Text>
-            <Text style={styles.emptyText}>当日无到期物品</Text>
+            <Text style={styles.emptyText}>当日无待办事项</Text>
             <Text style={styles.emptySubtext}>
-              点击日历上有红点的日期查看到期物品
+              点击日历上有红点的日期查看到期或待办事项
             </Text>
           </View>
         ) : (
           <View style={styles.itemList}>
-            {filteredItems.map((item) => {
-              const daysRemaining = getDaysRemaining(item.expiryDate!);
+            {filteredReminders.map((reminder) => {
+              const targetDate =
+                reminder.reminderType === "one_time"
+                  ? reminder.dueDate!
+                  : reminder.nextDueDate!;
+              const daysRemaining = getDaysRemaining(targetDate);
               const statusColor = getStatusColor(daysRemaining);
-              const statusText = getStatusText(daysRemaining);
+              const statusText = getStatusText(daysRemaining, reminder.reminderType);
 
               return (
-                <View key={item.id} style={styles.itemCard}>
+                <View key={reminder.id} style={styles.itemCard}>
                   <View style={styles.itemLeft}>
                     <View style={styles.iconContainer}>
-                      <Text style={styles.itemIcon}>{item.icon || "📦"}</Text>
+                      <Text style={styles.itemIcon}>{reminder.item.icon || "📦"}</Text>
                     </View>
                     <View style={styles.itemInfo}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <Text style={styles.itemDate}>
-                        {formatDate(item.expiryDate!)}
-                      </Text>
+                      <Text style={styles.itemName}>{reminder.item.name}</Text>
+                      <Text style={styles.itemReminderTitle}>{reminder.title}</Text>
+                      <Text style={styles.itemDate}>{formatDate(targetDate)}</Text>
                     </View>
                   </View>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: statusColor.bg },
-                    ]}
-                  >
-                    <Text style={[styles.statusText, { color: statusColor.text }]}>
-                      {statusText}
-                    </Text>
+                  <View style={styles.itemRight}>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        { backgroundColor: statusColor.bg },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.statusText, { color: statusColor.text }]}
+                      >
+                        {statusText}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.completeButton}
+                      onPress={() => handleComplete(reminder.id, reminder.title)}
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={24} color="#007AFF" />
+                    </TouchableOpacity>
                   </View>
                 </View>
               );
@@ -527,10 +574,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   todayButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
     backgroundColor: "#F2F2F7",
+    marginRight: 2,
   },
   todayButtonText: {
     fontSize: 13,
@@ -775,14 +823,26 @@ const styles = StyleSheet.create({
     color: "#000",
     marginBottom: 2,
   },
-  itemDate: {
+  itemReminderTitle: {
     fontSize: 14,
-    color: "#8E8E93",
+    color: "#666",
+    marginBottom: 2,
+  },
+  itemDate: {
+    fontSize: 12,
+    color: "#999",
+  },
+  itemRight: {
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  completeButton: {
+    padding: 4,
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   statusText: {
     fontSize: 13,
