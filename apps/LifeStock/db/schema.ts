@@ -1,7 +1,7 @@
 import { int, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // ============= 物品类型枚举 =============
-export type ItemType = "phone" | "product" | "account" | "supply" | "other";
+export type ItemType = "phone" | "product" | "account" | "other";
 
 // ============= 提醒类型枚举 =============
 export type ReminderType = "one_time" | "recurring";
@@ -12,7 +12,7 @@ export type RecurrenceUnit = "day" | "week" | "month" | "year";
 // ============= 物品表 =============
 export const items = sqliteTable("items", {
     id: text("id").primaryKey(),
-    type: text("type").notNull(), // 'phone' | 'product' | 'account' | 'supply' | 'other'
+    type: text("type").notNull(), // 'phone' | 'product' | 'account' | 'other'
     name: text("name").notNull(), // 名称
     icon: text("icon"), // emoji 图标
     category: text("category"), // 分类（可选）

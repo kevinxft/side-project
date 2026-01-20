@@ -113,7 +113,7 @@ export default function HomeScreen() {
   const handleAddPress = useCallback(() => {
     ActionSheetIOS.showActionSheetWithOptions(
       {
-        options: ["取消", "产品 / 耗材", "账号信息", "手机号码", "其他记录"],
+        options: ["取消", "物品", "账号信息", "手机号码", "其他记录"],
         cancelButtonIndex: 0,
         title: "添加记录",
         message: "选择您要记录的类型",
@@ -137,7 +137,7 @@ export default function HomeScreen() {
           headerTransparent: true,
           headerShadowVisible: true,
           headerLeft: () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: -4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -254,8 +254,7 @@ export default function HomeScreen() {
               const iconBgClass =
                 item.type === "product" ? "bg-blue-50" :
                   item.type === "account" ? "bg-purple-50" :
-                    item.type === "phone" ? "bg-green-50" :
-                      item.type === "supply" ? "bg-orange-50" : "bg-gray-100";
+                    item.type === "phone" ? "bg-green-50" : "bg-gray-100";
 
               return (
                 <Pressable
@@ -264,7 +263,7 @@ export default function HomeScreen() {
                     if (isEditMode) {
                       handleToggleSelect(item.id);
                     } else {
-                      router.push(`/(home)/${item.id}`);
+                      router.push(`/(item)/${item.id}`);
                     }
                   }}
                   className={`bg-white rounded-3xl p-4 mb-3 ${isSelected ? 'border-2 border-blue-500' : 'border border-transparent'} shadow-[0_2px_8px_rgba(0,0,0,0.04)]`}

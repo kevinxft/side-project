@@ -35,6 +35,12 @@ export default function RootLayout() {
                   headerShown: false,
                 }}
               />
+              <Stack.Screen
+                name="(item)"
+                options={{
+                  headerShown: false,
+                }}
+              />
             </Stack>
           </DatabaseProvider>
         </BottomSheetModalProvider>

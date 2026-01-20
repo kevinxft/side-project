@@ -21,6 +21,14 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
+        name="(timeline)"
+        options={{
+          title: "时间线",
+          tabBarIcon: { type: "sfSymbol", name: "list.bullet" },
+        }}
+      />
+
+      <Tabs.Screen
         name="(calendar)"
         options={{
           title: "日历",
@@ -45,4 +53,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-

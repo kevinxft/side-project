@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import Svg, { Rect } from "react-native-svg";
 
 // 类型映射
 const TYPE_LABELS: Record<string, string> = {
@@ -87,28 +86,6 @@ export default function ItemDetailScreen() {
     // ignore
   }
 
-  // 计算近30天完成统计
-  const now = Date.now();
-  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
-  const recentLogs = logs.filter((log) => log.completedAt >= thirtyDaysAgo);
-
-  // 按日期分组
-  const dailyCounts: Record<string, number> = {};
-  for (let i = 0; i < 30; i++) {
-    const d = new Date(now - i * 24 * 60 * 60 * 1000);
-    const key = `${d.getMonth() + 1}/${d.getDate()}`;
-    dailyCounts[key] = 0;
-  }
-  recentLogs.forEach((log) => {
-    const d = new Date(log.completedAt);
-    const key = `${d.getMonth() + 1}/${d.getDate()}`;
-    if (key in dailyCounts) {
-      dailyCounts[key]++;
-    }
-  });
-  const last7Days = Object.entries(dailyCounts).slice(0, 7).reverse();
-  const maxCount = Math.max(...last7Days.map(([, c]) => c), 1);
-
   return (
     <>
       <Stack.Screen
@@ -117,7 +94,7 @@ export default function ItemDetailScreen() {
           headerRight: () => (
             <Pressable
               className="px-2"
-              onPress={() => router.push(`/(home)/edit/${item.id}`)}
+              onPress={() => router.push(`/(item)/edit/${item.id}`)}
             >
               <Text className="text-[16px] font-bold text-[#007AFF]">编辑</Text>
             </Pressable>
@@ -218,48 +195,6 @@ export default function ItemDetailScreen() {
                   </View>
                 );
               })}
-            </View>
-          </View>
-        )}
-
-        {/* ====== 近7天统计图表 ====== */}
-        {logs.length > 0 && (
-          <View className="mx-4 mt-4">
-            <Text className="text-sm font-medium text-gray-500 mb-2 ml-1">
-              近 7 天完成统计
-            </Text>
-            <View className="bg-white rounded-2xl p-4 shadow-sm">
-              <Svg height={80} width="100%">
-                {last7Days.map(([date, count], index) => {
-                  const barWidth = 28;
-                  const gap = 10;
-                  const x = index * (barWidth + gap) + 8;
-                  const barHeight = (count / maxCount) * 60;
-                  return (
-                    <React.Fragment key={date}>
-                      <Rect
-                        x={x}
-                        y={70 - barHeight}
-                        width={barWidth}
-                        height={Math.max(barHeight, 2)}
-                        fill="#007AFF"
-                        rx={4}
-                      />
-                    </React.Fragment>
-                  );
-                })}
-              </Svg>
-              <View className="flex-row mt-2">
-                {last7Days.map(([date]) => (
-                  <Text
-                    key={date}
-                    className="text-xs text-gray-400"
-                    style={{ width: 38, textAlign: "center" }}
-                  >
-                    {date}
-                  </Text>
-                ))}
-              </View>
             </View>
           </View>
         )}

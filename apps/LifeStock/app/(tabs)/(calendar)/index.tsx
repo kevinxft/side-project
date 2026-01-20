@@ -2,7 +2,7 @@ import type { Item, Reminder } from "@/db/schema";
 import { reminderService } from "@/db/services";
 import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -379,6 +379,7 @@ function Calendar({ selectedDate, onSelectDate, markedDates }: CalendarProps) {
 export type ReminderWithItem = Reminder & { item: Item };
 
 export default function CalendarScreen() {
+  const router = useRouter();
   const [remindersList, setRemindersList] = useState<ReminderWithItem[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -480,7 +481,14 @@ export default function CalendarScreen() {
               const statusText = getStatusText(targetDate, reminder.reminderType);
 
               return (
-                <View key={reminder.id} style={styles.itemCard}>
+                <Pressable
+                  key={reminder.id}
+                  onPress={() => router.push(`/(item)/${reminder.item.id}`)}
+                  style={({ pressed }) => [
+                    styles.itemCard,
+                    pressed && styles.itemCardPressed,
+                  ]}
+                >
                   <View style={styles.itemLeft}>
                     <View style={styles.iconContainer}>
                       <Text style={styles.itemIcon}>{reminder.item.icon || "📦"}</Text>
@@ -511,7 +519,7 @@ export default function CalendarScreen() {
                       <Ionicons name="checkmark-circle-outline" size={24} color="#007AFF" />
                     </TouchableOpacity>
                   </View>
-                </View>
+                </Pressable>
               );
             })}
           </View>
@@ -804,6 +812,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 4,
     elevation: 1,
+  },
+  itemCardPressed: {
+    opacity: 0.7,
   },
   itemLeft: {
     flexDirection: "row",

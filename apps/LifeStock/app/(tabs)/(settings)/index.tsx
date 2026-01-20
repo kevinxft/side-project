@@ -1,15 +1,42 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Picker } from "@react-native-picker/picker";
 import Constants from "expo-constants";
 import { Stack } from "expo-router";
 import React, { useState } from "react";
-import { Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Switch, Text, View } from "react-native";
 
 export default function SettingsScreen() {
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [defaultReminderHour, setDefaultReminderHour] = useState(9);
+    const [defaultReminderMinute, setDefaultReminderMinute] = useState(0);
+    const [showTimePicker, setShowTimePicker] = useState(false);
+    const [tempHour, setTempHour] = useState(9);
+    const [tempMinute, setTempMinute] = useState(0);
 
     const appVersion = Constants.expoConfig?.version || "1.0.0";
     const buildNumber = Constants.expoConfig?.ios?.buildNumber || "1";
+
+    const formatTime = (hour: number, minute: number) =>
+        `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+
+    const openTimePicker = () => {
+        setTempHour(defaultReminderHour);
+        setTempMinute(defaultReminderMinute);
+        setShowTimePicker(true);
+    };
+
+    const confirmTimeSelection = () => {
+        setDefaultReminderHour(tempHour);
+        setDefaultReminderMinute(tempMinute);
+        setShowTimePicker(false);
+    };
+
+    const cancelTimeSelection = () => {
+        setShowTimePicker(false);
+    };
+
+    const hourOptions = Array.from({ length: 24 }, (_, i) => i);
+    const minuteOptions = Array.from({ length: 60 }, (_, i) => i);
 
     // 通用行组件，减少重复代码并统一视觉
     const SettingRow = ({
@@ -84,10 +111,10 @@ export default function SettingsScreen() {
                             iconBg="bg-orange-500"
                             label="默认提醒时间"
                             isLast
-                            onPress={() => { }}
+                            onPress={openTimePicker}
                         >
                             <Text className="text-[17px] text-[#8E8E93] mr-1">
-                                {String(defaultReminderHour).padStart(2, "0")}:00
+                                {formatTime(defaultReminderHour, defaultReminderMinute)}
                             </Text>
                             <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
                         </SettingRow>
@@ -108,6 +135,61 @@ export default function SettingsScreen() {
 
                 <View className="h-20" />
             </ScrollView>
+
+            <Modal
+                visible={showTimePicker}
+                transparent
+                animationType="fade"
+                onRequestClose={cancelTimeSelection}
+            >
+                <Pressable
+                    className="flex-1 items-center justify-center bg-black/40"
+                    onPress={cancelTimeSelection}
+                >
+                    <Pressable
+                        className="bg-white rounded-2xl w-[80%] overflow-hidden"
+                        onPress={() => { }}
+                    >
+                        <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100">
+                            <Pressable onPress={cancelTimeSelection}>
+                                <Text className="text-[15px] text-gray-500">取消</Text>
+                            </Pressable>
+                            <Text className="text-[16px] font-semibold text-black">选择时间</Text>
+                            <Pressable onPress={confirmTimeSelection}>
+                                <Text className="text-[15px] font-semibold text-[#007AFF]">完成</Text>
+                            </Pressable>
+                        </View>
+                        <View className="flex-row">
+                            <Picker
+                                style={{ flex: 1, height: 200 }}
+                                selectedValue={tempHour}
+                                onValueChange={(value) => setTempHour(value as number)}
+                            >
+                                {hourOptions.map((hour) => (
+                                    <Picker.Item
+                                        key={hour}
+                                        label={String(hour).padStart(2, "0")}
+                                        value={hour}
+                                    />
+                                ))}
+                            </Picker>
+                            <Picker
+                                style={{ flex: 1, height: 200 }}
+                                selectedValue={tempMinute}
+                                onValueChange={(value) => setTempMinute(value as number)}
+                            >
+                                {minuteOptions.map((minute) => (
+                                    <Picker.Item
+                                        key={minute}
+                                        label={String(minute).padStart(2, "0")}
+                                        value={minute}
+                                    />
+                                ))}
+                            </Picker>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </>
     );
 }

@@ -260,6 +260,23 @@ export const reminderService = {
         await db.delete(reminders).where(eq(reminders.id, id));
     },
 
+    // 更新提醒
+    async update(id: string, data: Partial<Omit<NewReminder, "id" | "createdAt">>): Promise<void> {
+        await db
+            .update(reminders)
+            .set({ ...data, updatedAt: now() })
+            .where(eq(reminders.id, id));
+    },
+
+    // 获取物品的第一个提醒
+    async getByItemId(itemId: string): Promise<Reminder | undefined> {
+        const result = await db
+            .select()
+            .from(reminders)
+            .where(eq(reminders.itemId, itemId));
+        return result[0];
+    },
+
     // 获取物品关联的所有提醒完成记录
     async getLogsForItem(itemId: string): Promise<(ReminderLog & { reminder: Reminder })[]> {
         const result = await db

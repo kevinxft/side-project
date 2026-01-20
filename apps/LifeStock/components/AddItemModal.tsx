@@ -15,10 +15,9 @@ import {
 import { ReminderSection } from "./ReminderSection";
 
 const TYPE_CONFIG: Record<ItemType, { label: string; icon: string; color: string }> = {
-    product: { label: "产品", icon: "cube-outline", color: "#3B82F6" },
+    product: { label: "物品", icon: "cube-outline", color: "#3B82F6" },
     account: { label: "账号", icon: "card-outline", color: "#8B5CF6" },
     phone: { label: "号码", icon: "call-outline", color: "#10B981" },
-    supply: { label: "耗材", icon: "brush-outline", color: "#F59E0B" },
     other: { label: "其他", icon: "ellipsis-horizontal-outline", color: "#6B7280" },
 };
 
@@ -198,7 +197,7 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
 
             try {
                 const metadata: any = {};
-                if (type === "product" || type === "supply") {
+                if (type === "product") {
                     metadata.quantity = quantity ? parseFloat(quantity) : null;
                     metadata.unit = unit || null;
                     metadata.minQuantity = minQuantity ? parseFloat(minQuantity) : null;
@@ -255,7 +254,6 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
             if (newType === "product") setIcon("📦");
             else if (newType === "account") setIcon("💳");
             else if (newType === "phone") setIcon("📱");
-            else if (newType === "supply") setIcon("🪥");
             else setIcon("📁");
         };
 
@@ -272,8 +270,8 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
         const timeLabel = formatTime(reminderHour, reminderMinute);
 
         const FormRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
-            <View className="flex-row items-center justify-between px-4 py-3 h-12">
-                <Text className="text-[17px] text-black">{label}</Text>
+            <View className="flex-row items-center justify-between px-4 py-3 min-h-[48px]">
+                <Text className="text-[17px] text-black shrink-0 mr-3">{label}</Text>
                 {children}
             </View>
         );
@@ -335,14 +333,14 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
                 >
                     {/* 名称/核心信息卡片 */}
                     <View className="mx-4 mb-6 bg-white rounded-2xl overflow-hidden">
-                        {(type === "product" || type === "supply" || type === "other") && (
+                        {(type === "product" || type === "other") && (
                             <View className="flex-row items-center px-4 py-3 border-b border-gray-100">
                                 <View className="w-10 h-10 rounded-full bg-gray-50 items-center justify-center mr-3 border border-gray-100">
                                     <Text className="text-[22px]">{icon}</Text>
                                 </View>
                                 <TextInput
                                     className="flex-1 text-[17px] font-medium text-black h-10"
-                                    placeholder={type === "other" ? "名称" : (type === "product" ? "产品名称" : "耗材名称")}
+                                    placeholder={type === "other" ? "名称" : "物品名称"}
                                     placeholderTextColor="#C7C7CC"
                                     value={name}
                                     onChangeText={setName}
@@ -396,27 +394,8 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
                         </View>
                     </View>
 
-                    {/* 类型选择 - 仅在 Product/Supply 下显示切换 */}
-                    {(type === "product" || type === "supply") && (
-                        <View className="mb-6">
-                            <View className="flex-row bg-gray-200/50 p-1 mx-4 rounded-xl">
-                                {(['product', 'supply'] as const).map(m => (
-                                    <Pressable
-                                        key={m}
-                                        onPress={() => handleTypeChange(m)}
-                                        className={`flex-1 py-1.5 rounded-[10px] items-center justify-center ${type === m ? "bg-white shadow-sm" : ""}`}
-                                    >
-                                        <Text className={`text-[13px] font-semibold ${type === m ? "text-black" : "text-gray-500"}`}>
-                                            {m === "product" ? "产品" : "耗材"}
-                                        </Text>
-                                    </Pressable>
-                                ))}
-                            </View>
-                        </View>
-                    )}
-
-                    {/* Product/Supply Form */}
-                    {(type === "product" || type === "supply") && (
+                    {/* Product Form */}
+                    {type === "product" && (
                         <View className="mx-4 mb-6 bg-white rounded-2xl overflow-hidden">
                             <View className="border-b border-gray-100">
                                 <FormRow label="当前库存">
@@ -559,6 +538,7 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
                                 <Picker
                                     style={{ flex: 1, height: 200 }}
                                     selectedValue={tempYear}
+                                    itemStyle={{ fontSize: 18 }}
                                     onValueChange={(value) => {
                                         const nextYear = value as number;
                                         const maxDay = new Date(nextYear, tempMonth + 1, 0).getDate();
@@ -573,6 +553,7 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
                                 <Picker
                                     style={{ flex: 1, height: 200 }}
                                     selectedValue={tempMonth}
+                                    itemStyle={{ fontSize: 18 }}
                                     onValueChange={(value) => {
                                         const nextMonth = value as number;
                                         const maxDay = new Date(tempYear, nextMonth + 1, 0).getDate();
@@ -587,6 +568,7 @@ export const AddItemSheet = forwardRef<BottomSheetModal, AddItemSheetProps>(
                                 <Picker
                                     style={{ flex: 1, height: 200 }}
                                     selectedValue={tempDay}
+                                    itemStyle={{ fontSize: 18 }}
                                     onValueChange={(value) => setTempDay(value as number)}
                                 >
                                     {dayOptions.map((day) => (

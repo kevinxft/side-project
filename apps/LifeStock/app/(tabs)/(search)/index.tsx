@@ -55,7 +55,7 @@ export default function SearchScreen() {
 
     const handleItemPress = useCallback(
         (item: Item) => {
-            router.push(`/(home)/${item.id}`);
+            router.push(`/(item)/${item.id}`);
         },
         [router]
     );
