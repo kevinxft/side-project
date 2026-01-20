@@ -4,10 +4,14 @@ import { seedTestData } from "@/db/seed";
 import { itemService } from "@/db/services";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
-import { useFocusEffect, useNavigation, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
-import * as DropdownMenu from "zeego/dropdown-menu";
+import { Stack, useFocusEffect, useNavigation, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActionSheetIOS, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+
+
+
+
+
 
 
 export default function HomeScreen() {
@@ -19,6 +23,7 @@ export default function HomeScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isModalPending, setIsModalPending] = useState(false);
   const [activeType, setActiveType] = useState<ItemType | null>(null);
+
 
   const loadItems = useCallback(async () => {
     const data = await itemService.getAll();
@@ -105,108 +110,126 @@ export default function HomeScreen() {
     );
   }, [selectedIds, loadItems]);
 
+  const handleAddPress = useCallback(() => {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: ["取消", "产品 / 耗材", "账号信息", "手机号码", "其他记录"],
+        cancelButtonIndex: 0,
+        title: "添加记录",
+        message: "选择您要记录的类型",
+      },
+      (buttonIndex) => {
+        if (buttonIndex === 1) handleOpenAddItem("product");
+        else if (buttonIndex === 2) handleOpenAddItem("account");
+        else if (buttonIndex === 3) handleOpenAddItem("phone");
+        else if (buttonIndex === 4) handleOpenAddItem("other");
+      }
+    );
+  }, [handleOpenAddItem]);
+
   const hasItems = items.length > 0;
-
-  // 使用 useLayoutEffect 同步设置头部按钮，提高可靠性
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <View className="flex-row items-center px-2">
-          {hasItems && (
-            <Pressable
-              className="w-9 h-9 items-center justify-center"
-              onPress={handleToggleEditMode}
-            >
-              <Ionicons
-                name={isEditMode ? "close" : "create-outline"}
-                size={22}
-                color={isEditMode ? "#FF3B30" : "#1C1C1E"}
-              />
-            </Pressable>
-          )}
-          <Pressable
-            className="w-9 h-9 items-center justify-center"
-            onPress={async () => {
-              await seedTestData();
-              loadItems();
-            }}
-          >
-            <Ionicons name="sparkles-outline" size={20} color="#007AFF" />
-          </Pressable>
-        </View>
-      ),
-      headerRight: () => (
-        <View style={{ flexDirection: 'row', width: 30, alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8, alignSelf: 'flex-end' }}>
-          {isEditMode ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {hasItems && (
-                <Pressable
-                  onPress={handleToggleSelectAll}
-                  style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginRight: 4 }}
-                >
-                  <Ionicons
-                    name={selectedIds.size === items.length ? "checkmark-circle" : "checkmark-circle-outline"}
-                    size={22}
-                    color="#007AFF"
-                  />
-                </Pressable>
-              )}
-              <Pressable
-                onPress={handleDelete}
-                style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
-                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-              >
-                <Ionicons
-                  name="trash-outline"
-                  size={22}
-                  color={selectedIds.size > 0 ? "#FF3B30" : "#C7C7CC"}
-                />
-              </Pressable>
-            </View>
-          ) : (
-            <DropdownMenu.Root>
-              <DropdownMenu.Trigger asChild>
-                <Pressable
-                  className="w-9 h-9 items-center justify-center"
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons name="add" size={28} color="#007AFF" />
-                </Pressable>
-              </DropdownMenu.Trigger>
-
-              <DropdownMenu.Content>
-                <DropdownMenu.Item key="product" onSelect={() => handleOpenAddItem("product")}>
-                  <DropdownMenu.ItemTitle>产品 / 耗材</DropdownMenu.ItemTitle>
-                  <DropdownMenu.ItemIcon ios={{ name: "cube" }} />
-                </DropdownMenu.Item>
-
-                <DropdownMenu.Item key="account" onSelect={() => handleOpenAddItem("account")}>
-                  <DropdownMenu.ItemTitle>账号信息</DropdownMenu.ItemTitle>
-                  <DropdownMenu.ItemIcon ios={{ name: "person.crop.circle" }} />
-                </DropdownMenu.Item>
-
-                <DropdownMenu.Item key="phone" onSelect={() => handleOpenAddItem("phone")}>
-                  <DropdownMenu.ItemTitle>手机号码</DropdownMenu.ItemTitle>
-                  <DropdownMenu.ItemIcon ios={{ name: "phone" }} />
-                </DropdownMenu.Item>
-
-                <DropdownMenu.Separator />
-
-                <DropdownMenu.Item key="other" onSelect={() => handleOpenAddItem("other")}>
-                  <DropdownMenu.ItemTitle>其他记录</DropdownMenu.ItemTitle>
-                  <DropdownMenu.ItemIcon ios={{ name: "ellipsis.circle" }} />
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu.Root>
-          )}
-        </View>
-      ),
-    });
-  }, [navigation, isEditMode, hasItems, selectedIds.size, handleToggleEditMode, handleToggleSelectAll, handleDelete, handleOpenAddItem]);
 
   return (
     <>
-
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          headerTransparent: true,
+          headerShadowVisible: true,
+          headerLeft: () => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: -4 }}>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255,255,255,0.8)',
+                borderRadius: 20,
+                paddingHorizontal: 4,
+                height: 36,
+              }}>
+                {hasItems && (
+                  <Pressable
+                    hitSlop={10}
+                    style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
+                    onPress={handleToggleEditMode}
+                  >
+                    <Ionicons
+                      name={isEditMode ? "close" : "create-outline"}
+                      size={20}
+                      color={isEditMode ? "#FF3B30" : "#1C1C1E"}
+                    />
+                  </Pressable>
+                )}
+                {!isEditMode && (
+                  <Pressable
+                    hitSlop={10}
+                    style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
+                    onPress={async () => {
+                      await seedTestData();
+                      loadItems();
+                    }}
+                  >
+                    <Ionicons name="sparkles-outline" size={18} color="#007AFF" />
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          ),
+          headerRight: () => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: -4 }}>
+              {isEditMode ? (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(255,255,255,0.8)',
+                  borderRadius: 20,
+                  paddingHorizontal: 4,
+                  height: 36,
+                }}>
+                  {hasItems && (
+                    <Pressable
+                      hitSlop={10}
+                      style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
+                      onPress={handleToggleSelectAll}
+                    >
+                      <Ionicons
+                        name={selectedIds.size === items.length ? "checkmark-circle" : "checkmark-circle-outline"}
+                        size={20}
+                        color="#007AFF"
+                      />
+                    </Pressable>
+                  )}
+                  <Pressable
+                    hitSlop={10}
+                    style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}
+                    onPress={handleDelete}
+                  >
+                    <Ionicons
+                      name="trash-outline"
+                      size={20}
+                      color={selectedIds.size > 0 ? "#FF3B30" : "#C7C7CC"}
+                    />
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  hitSlop={10}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: 'rgba(255,255,255,0.8)',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onPress={handleAddPress}
+                >
+                  <Ionicons name="add" size={26} color="#007AFF" />
+                </Pressable>
+              )}
+            </View>
+          ),
+        }}
+      />
       <ScrollView
         className="flex-1 bg-[#F2F2F7]"
         contentInsetAdjustmentBehavior="automatic"
@@ -224,23 +247,15 @@ export default function HomeScreen() {
               添加生活物品，记录每一笔消费，{'\n'}让生活井井有条。
             </Text>
           </View>
-
         ) : (
           <View className="px-4 py-2">
             {items.map((item) => {
               const isSelected = selectedIds.has(item.id);
-              // 根据类型设置图标背景色
               const iconBgClass =
                 item.type === "product" ? "bg-blue-50" :
                   item.type === "account" ? "bg-purple-50" :
                     item.type === "phone" ? "bg-green-50" :
                       item.type === "supply" ? "bg-orange-50" : "bg-gray-100";
-
-              const iconColor =
-                item.type === "product" ? "#3B82F6" :
-                  item.type === "account" ? "#8B5CF6" :
-                    item.type === "phone" ? "#10B981" :
-                      item.type === "supply" ? "#F59E0B" : "#6B7280";
 
               return (
                 <Pressable
@@ -277,11 +292,6 @@ export default function HomeScreen() {
                         <Text className="text-[17px] font-semibold text-black mb-1" numberOfLines={1}>
                           {item.name}
                         </Text>
-                        {item.updatedAt && (
-                          <Text className="text-[10px] text-gray-300">
-                            {/* 时间展示逻辑可后续优化 */}
-                          </Text>
-                        )}
                       </View>
 
                       {(() => {
@@ -347,3 +357,5 @@ export default function HomeScreen() {
     </>
   );
 }
+
+const styles = StyleSheet.create({});
