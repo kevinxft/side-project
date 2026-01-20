@@ -1,4 +1,5 @@
 import { DatabaseProvider } from "@/components/DatabaseProvider";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Stack } from "expo-router";
 import { HeroUINativeProvider } from "heroui-native";
 import React from "react";
@@ -25,11 +26,18 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <HeroUINativeProvider>
-        <DatabaseProvider fallback={<DatabaseLoading />}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          </Stack>
-        </DatabaseProvider>
+        <BottomSheetModalProvider>
+          <DatabaseProvider fallback={<DatabaseLoading />}>
+            <Stack>
+              <Stack.Screen
+                name="(tabs)"
+                options={{
+                  headerShown: false,
+                }}
+              />
+            </Stack>
+          </DatabaseProvider>
+        </BottomSheetModalProvider>
       </HeroUINativeProvider>
     </GestureHandlerRootView>
   );

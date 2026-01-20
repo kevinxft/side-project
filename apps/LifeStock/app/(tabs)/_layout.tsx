@@ -2,46 +2,46 @@ import { createNativeBottomTabNavigator } from "@react-navigation/bottom-tabs/un
 import { withLayoutContext } from "expo-router";
 import React from "react";
 
-const { Navigator } = createNativeBottomTabNavigator();
-
-const Tabs = withLayoutContext(Navigator);
+// 使用 withLayoutContext 将 React Navigation 的原生 Tab 导航器接入 Expo Router
+const Tabs = withLayoutContext(createNativeBottomTabNavigator().Navigator);
 
 export default function TabLayout() {
   return (
-    <Tabs>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
       <Tabs.Screen
-        name="index"
+        name="(home)"
         options={{
-          title: "首页",
-          tabBarSystemItem: "favorites",
+          title: "库存",
+          tabBarIcon: { type: "sfSymbol", name: "archivebox.fill" },
         }}
       />
+
       <Tabs.Screen
-        name="contacts"
+        name="(calendar)"
         options={{
-          title: "联系人",
-          tabBarSystemItem: "contacts",
+          title: "日历",
         }}
       />
+
       <Tabs.Screen
-        name="settings"
-        options={{
-          title: "设置",
-          tabBarSystemItem: "more",
-        }}
-      />
-      <Tabs.Screen
-        name="search"
+        name="(search)"
         options={{
           tabBarSystemItem: "search",
-          headerShown: true,
-          headerTransparent: true,
-          headerTitle: "",
-          headerSearchBarOptions: {
-            placeholder: "搜索...",
-          },
+        }}
+      />
+
+      <Tabs.Screen
+        name="(settings)"
+        options={{
+          title: "设置",
+          tabBarIcon: { type: "sfSymbol", name: "gearshape.fill" },
         }}
       />
     </Tabs>
   );
 }
+

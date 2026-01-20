@@ -18,6 +18,15 @@ export const itemService = {
         return db.select().from(items);
     },
 
+    // 获取有到期日期的物品（按到期日期排序）
+    async getWithExpiry(): Promise<Item[]> {
+        return db
+            .select()
+            .from(items)
+            .where(isNotNull(items.expiryDate))
+            .orderBy(asc(items.expiryDate));
+    },
+
     // 按类型获取物品
     async getByKind(kind: ItemKind): Promise<Item[]> {
         return db.select().from(items).where(eq(items.kind, kind));
