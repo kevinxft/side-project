@@ -16,7 +16,6 @@ export type RecipeInput = {
   ingredients?: Ingredient[];
   bake?: BakeSetting | null;
   steps?: string[];
-  tips?: string[];
   notes?: string;
 };
 
@@ -40,12 +39,11 @@ const createRecipeId = () => {
   return `r_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 };
 
-const normalizeRecipeInput = (input: RecipeInput): Omit<Recipe, keyof BaseEntity> => ({
+  const normalizeRecipeInput = (input: RecipeInput): Omit<Recipe, keyof BaseEntity> => ({
   title: input.title,
   ingredients: input.ingredients ?? [],
   bake: input.bake ?? null,
   steps: input.steps ?? [],
-  tips: input.tips ?? [],
   notes: input.notes ?? '',
 });
 
@@ -84,7 +82,6 @@ export const useRecipeStore = create<RecipeStoreState>()(
                 ingredients: patch.ingredients ?? recipe.ingredients,
                 bake: patch.bake ?? recipe.bake,
                 steps: patch.steps ?? recipe.steps,
-                tips: patch.tips ?? recipe.tips,
                 notes: patch.notes ?? recipe.notes,
               }),
               updatedAt: new Date().toISOString(),
@@ -120,12 +117,33 @@ export const useRecipeStore = create<RecipeStoreState>()(
           return { recipes: [], schemaVersion: RECIPE_SCHEMA_VERSION };
         }
 
-        if (version === RECIPE_SCHEMA_VERSION) {
-          return persistedState as RecipeStoreState;
+        const state = persistedState as {
+          recipes?: Array<Recipe & { tips?: string[] }>;
+          schemaVersion?: number;
+        };
+
+        let recipes = state.recipes ?? [];
+
+        if (version < 2) {
+          recipes = recipes.map((recipe) => {
+            const tips = recipe.tips ?? [];
+            const tipsText =
+              tips.length > 0
+                ? `要点：\n${tips.map((tip) => `- ${tip}`).join('\n')}`
+                : '';
+            const notes = [recipe.notes?.trim(), tipsText].filter(Boolean).join('\n\n');
+
+            const { tips: _ignored, ...rest } = recipe;
+            return {
+              ...rest,
+              notes,
+              schemaVersion: RECIPE_SCHEMA_VERSION,
+            };
+          });
         }
 
         return {
-          recipes: (persistedState as RecipeStoreState).recipes ?? [],
+          recipes,
           schemaVersion: RECIPE_SCHEMA_VERSION,
         };
       },

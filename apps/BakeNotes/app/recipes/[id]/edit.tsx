@@ -31,7 +31,14 @@ export default function EditRecipeScreen() {
 
   return (
     <View className="flex-1 bg-[#f8f3ed]">
-      <Stack.Screen options={{ title: '编辑配方', headerShown: true }} />
+      <Stack.Screen
+        options={{
+          title: '编辑配方',
+          headerShown: true,
+          headerBackTitle: '返回',
+          headerBackTitleVisible: true,
+        }}
+      />
       <RecipeForm
         initialValue={recipe}
         submitLabel="保存修改"

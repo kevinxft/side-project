@@ -79,14 +79,27 @@ export default function RecipeDetailScreen() {
         options={{
           title: recipe.title,
           headerShown: true,
+          headerBackTitle: '返回',
+          headerBackTitleVisible: true,
           headerRight: () => (
-            <Pressable onPress={() => router.push(`/recipes/${recipe.id}/edit`)}>
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: '/recipes/[id]/edit',
+                  params: { id: recipe.id },
+                })
+              }
+              className="px-2 py-1"
+            >
               <Text className="text-[14px] font-semibold text-[#b86b2f]">编辑</Text>
             </Pressable>
           ),
         }}
       />
-      <ScrollView contentContainerStyle={detailContentStyle}>
+      <ScrollView
+        contentContainerStyle={detailContentStyle}
+        contentInsetAdjustmentBehavior="automatic"
+      >
         <Section title="用料">
           {recipe.ingredients.length === 0 ? (
             <EmptyLine />
@@ -148,19 +161,7 @@ export default function RecipeDetailScreen() {
           ) : null}
         </Section>
 
-        <Section title="要点提示">
-          {recipe.tips.length === 0 ? (
-            <EmptyLine />
-          ) : (
-            recipe.tips.map((tip, index) => (
-              <Text key={`${index}-${tip}`} className="mb-1.5 text-[14px] leading-5 text-[#1f1f1f]">
-                · {tip}
-              </Text>
-            ))
-          )}
-        </Section>
-
-        <Section title="备注">
+        <Section title="备注 / 提示">
           {recipe.notes ? (
             <Text className="text-[14px] leading-5 text-[#1f1f1f]">
               {recipe.notes}

@@ -1,4 +1,4 @@
-export const RECIPE_SCHEMA_VERSION = 1 as const;
+export const RECIPE_SCHEMA_VERSION = 2 as const;
 
 export type RecipeSchemaVersion = typeof RECIPE_SCHEMA_VERSION;
 
@@ -38,6 +38,5 @@ export interface Recipe extends BaseEntity {
   ingredients: Ingredient[];
   bake: BakeSetting | null;
   steps: string[];
-  tips: string[];
   notes: string;
 }
