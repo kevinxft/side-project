@@ -6,6 +6,7 @@ import {
   type BakeSetting,
   type BaseEntity,
   type Ingredient,
+  type IngredientUnit,
   RECIPE_SCHEMA_VERSION,
   type Recipe,
   type RecipeSchemaVersion,
@@ -118,7 +119,12 @@ export const useRecipeStore = create<RecipeStoreState>()(
         }
 
         const state = persistedState as {
-          recipes?: Array<Recipe & { tips?: string[] }>;
+          recipes?: Array<
+            Recipe & {
+              tips?: string[];
+              ingredients?: Array<Ingredient & { grams?: number | null }>;
+            }
+          >;
           schemaVersion?: number;
         };
 
@@ -137,13 +143,32 @@ export const useRecipeStore = create<RecipeStoreState>()(
             return {
               ...rest,
               notes,
-              schemaVersion: RECIPE_SCHEMA_VERSION,
             };
           });
         }
 
+        if (version < 3) {
+          recipes = recipes.map((recipe) => ({
+            ...recipe,
+            ingredients: (recipe.ingredients ?? []).map((ingredient) => ({
+              name: ingredient.name ?? '',
+              amount:
+                typeof ingredient.amount === 'number' || ingredient.amount === null
+                  ? ingredient.amount
+                  : typeof ingredient.grams === 'number'
+                    ? ingredient.grams
+                    : null,
+              unit: (ingredient.unit as IngredientUnit | undefined) ?? 'g',
+              note: ingredient.note ?? '',
+            })),
+          }));
+        }
+
         return {
-          recipes,
+          recipes: recipes.map((recipe) => ({
+            ...recipe,
+            schemaVersion: RECIPE_SCHEMA_VERSION,
+          })),
           schemaVersion: RECIPE_SCHEMA_VERSION,
         };
       },

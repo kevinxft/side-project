@@ -106,7 +106,7 @@ export default function RecipeDetailScreen() {
           ) : (
             recipe.ingredients.map((item, index) => {
               const detail = [
-                item.grams !== null ? `${item.grams} g` : null,
+                item.amount !== null ? `${item.amount} ${item.unit}` : null,
                 item.note?.trim() ? item.note : null,
               ]
                 .filter(Boolean)

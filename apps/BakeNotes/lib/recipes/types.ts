@@ -1,4 +1,4 @@
-export const RECIPE_SCHEMA_VERSION = 2 as const;
+export const RECIPE_SCHEMA_VERSION = 3 as const;
 
 export type RecipeSchemaVersion = typeof RECIPE_SCHEMA_VERSION;
 
@@ -13,9 +13,12 @@ export interface BaseEntity {
   schemaVersion: RecipeSchemaVersion;
 }
 
+export type IngredientUnit = 'g' | 'ml' | '个';
+
 export interface Ingredient {
   name: string;
-  grams: number | null;
+  amount: number | null;
+  unit: IngredientUnit;
   note: string;
 }
 

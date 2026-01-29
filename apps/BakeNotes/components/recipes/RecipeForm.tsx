@@ -4,13 +4,15 @@ import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-nativ
 
 import {
   type BakeStageType,
+  type IngredientUnit,
   type Recipe,
   type RecipeInput,
 } from '@/lib/recipes';
 
 type IngredientDraft = {
   name: string;
-  grams: string;
+  amount: string;
+  unit: IngredientUnit;
   note: string;
 };
 
@@ -59,7 +61,8 @@ const stageTypeOptions: { value: BakeStageType; label: string }[] = [
 
 const createIngredientDraft = (): IngredientDraft => ({
   name: '',
-  grams: '',
+  amount: '',
+  unit: 'g',
   note: '',
 });
 
@@ -82,11 +85,22 @@ const toNumberOrNull = (value: string) => {
 const toDraft = (recipe?: Recipe): RecipeDraft => ({
   title: recipe?.title ?? '',
   ingredients:
-    recipe?.ingredients.map((item) => ({
-      name: item.name,
-      grams: item.grams === null ? '' : String(item.grams),
-      note: item.note,
-    })) ?? [createIngredientDraft()],
+    recipe?.ingredients.map((item) => {
+      const legacyGrams = (item as { grams?: number | null }).grams;
+      const amount =
+        item.amount !== null && typeof item.amount === 'number'
+          ? item.amount
+          : typeof legacyGrams === 'number'
+            ? legacyGrams
+            : null;
+
+      return {
+        name: item.name,
+        amount: amount === null ? '' : String(amount),
+        unit: item.unit ?? 'g',
+        note: item.note,
+      };
+    }) ?? [createIngredientDraft()],
   bake: recipe?.bake
     ? {
         stages: recipe.bake.stages.map((stage) => ({
@@ -108,7 +122,8 @@ const toInput = (draft: RecipeDraft): RecipeInput => {
   const ingredients = draft.ingredients
     .map((item) => ({
       name: item.name.trim(),
-      grams: toNumberOrNull(item.grams),
+      amount: toNumberOrNull(item.amount),
+      unit: item.unit,
       note: item.note.trim(),
     }))
     .filter((item) => item.name.length > 0);
@@ -208,6 +223,7 @@ export function RecipeForm({
                 className="mb-3 rounded-[16px] border border-[#eee2d4] bg-white p-3"
               >
                 <View className="flex-row items-center gap-2">
+                  <Text className="w-8 text-[12px] text-[#8a6a4d]">材料</Text>
                   <TextInput
                     value={item.name}
                     onChangeText={(value) =>
@@ -221,19 +237,20 @@ export function RecipeForm({
                     placeholderTextColor={placeholderTextColor}
                     className="flex-1 rounded-[12px] border border-[#eadfce] bg-[#fffaf5] px-3 py-2 text-[14px] text-[#2d1f12]"
                   />
+                  <Text className="w-8 text-[12px] text-[#8a6a4d]">数量</Text>
                   <TextInput
-                    value={item.grams}
+                    value={item.amount}
                     onChangeText={(value) =>
                       setIngredients((prev) =>
                         prev.map((entry, idx) =>
-                          idx === index ? { ...entry, grams: value } : entry
+                          idx === index ? { ...entry, amount: value } : entry
                         )
                       )
                     }
-                    placeholder="g"
+                    placeholder="0"
                     placeholderTextColor={placeholderTextColor}
                     keyboardType="numeric"
-                    className="w-[68px] rounded-[12px] border border-[#eadfce] bg-[#fffaf5] px-3 py-2 text-[14px] text-[#2d1f12]"
+                    className="w-[72px] rounded-[12px] border border-[#eadfce] bg-[#fffaf5] px-3 py-2 text-[14px] text-[#2d1f12]"
                   />
                   <Pressable
                     onPress={() =>
@@ -246,19 +263,53 @@ export function RecipeForm({
                     <MaterialIcons name="close" size={16} color={deleteIconColor} />
                   </Pressable>
                 </View>
-                <TextInput
-                  value={item.note}
-                  onChangeText={(value) =>
-                    setIngredients((prev) =>
-                      prev.map((entry, idx) =>
-                        idx === index ? { ...entry, note: value } : entry
+              <View className="mt-2 flex-row items-center gap-2">
+                <Text className="text-[12px] text-[#8a6a4d]">单位</Text>
+                <View className="flex-row items-center gap-2">
+                  {(['g', 'ml', '个'] as const).map((unit) => {
+                    const active = item.unit === unit;
+                    return (
+                      <Pressable
+                        key={`${index}-${unit}`}
+                        onPress={() =>
+                          setIngredients((prev) =>
+                            prev.map((entry, idx) =>
+                              idx === index ? { ...entry, unit } : entry
+                            )
+                          )
+                        }
+                        className={`rounded-full px-3 py-1 ${
+                          active ? 'bg-[#2f1f10]' : 'bg-[#f7efe6]'
+                        }`}
+                      >
+                        <Text
+                          className={`text-[12px] font-semibold ${
+                            active ? 'text-white' : 'text-[#8a6a4d]'
+                          }`}
+                        >
+                          {unit}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+                <View className="mt-2 flex-row items-center gap-2">
+                  <Text className="w-8 text-[12px] text-[#8a6a4d]">备注</Text>
+                  <TextInput
+                    value={item.note}
+                    onChangeText={(value) =>
+                      setIngredients((prev) =>
+                        prev.map((entry, idx) =>
+                          idx === index ? { ...entry, note: value } : entry
+                        )
                       )
-                    )
-                  }
-                  placeholder="备注（如 1 个 / 适量）"
-                  placeholderTextColor={placeholderTextColor}
-                  className="mt-2 rounded-[12px] border border-[#eadfce] bg-[#fffaf5] px-3 py-2 text-[14px] text-[#2d1f12]"
-                />
+                    }
+                    placeholder="如 1 个 / 适量"
+                    placeholderTextColor={placeholderTextColor}
+                    className="flex-1 rounded-[12px] border border-[#eadfce] bg-[#fffaf5] px-3 py-2 text-[14px] text-[#2d1f12]"
+                  />
+                </View>
               </View>
             ))
           )}
