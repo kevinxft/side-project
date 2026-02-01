@@ -30,7 +30,7 @@ export default function EditRecipeScreen() {
   }
 
   return (
-    <View className="flex-1 bg-[#f8f3ed]">
+    <View className="flex-1 bg-[#f9fafb]">
       <Stack.Screen
         options={{
           title: '编辑配方',

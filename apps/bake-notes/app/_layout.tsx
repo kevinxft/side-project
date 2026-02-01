@@ -13,6 +13,7 @@ const headerBackground =
 export default function RootLayout() {
   return (
     <Stack
+      initialRouteName="index"
       screenOptions={{
         headerShown: false,
         headerTransparent: true,

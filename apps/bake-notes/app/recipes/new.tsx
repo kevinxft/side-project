@@ -31,7 +31,7 @@ export default function NewRecipeScreen() {
   );
 
   return (
-    <View className="flex-1 bg-[#f8f3ed]">
+    <View className="flex-1 bg-[#f9fafb]">
       <Stack.Screen
         options={{
           title: '新建配方',
